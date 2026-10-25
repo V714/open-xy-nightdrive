@@ -43,6 +43,44 @@ The machine is at the repository root; its catalog path is `.`. Minimum supporte
 CI checks against Open-XY staging commit `fdf48e583ebb19fb5cd191687229bf77107f1aed`
 (SDK 1.2, compatible with this machine's SDK 1.1 contract).
 
+### Quick installation
+
+For users with an existing Open-XY SDK checkout and a configured native toolchain.
+Run the following commands from the SDK directory:
+
+1. Clone Nightdrive alongside the SDK:
+
+   ```sh
+   git clone https://github.com/V714/open-xy-nightdrive.git ../open-xy-nightdrive
+   ```
+
+2. Fetch the official collection:
+
+   ```sh
+   python sdk.py catalog fetch
+   ```
+
+3. Build a personal kit containing Nightdrive:
+
+   ```sh
+   python sdk.py kit --personal \
+     --collection local/catalog/collection.json \
+     --machine ../open-xy-nightdrive \
+     --stock-os /path/to/original/os.ldr \
+     --out /path/outside/repositories/nightdrive-kit
+   ```
+
+4. Open the generated **`opxy-builder.html`** in a compatible browser, select
+   Nightdrive, and follow the installation guide.
+
+Replace the example paths with your own. The OS input must be the original stock
+OP-XY 1.2.0 `os.ldr`. Keep the output directory outside every Git checkout.
+No SDK modifications are required. See the SDK's
+[build guide](https://github.com/etcetc000/open-xy/blob/staging/docs/build.md)
+for toolchain setup and supported build hosts.
+
+### Preview and development
+
 Install the tools described in the SDK's
 [first-machine guide](https://github.com/etcetc000/open-xy/blob/staging/docs/first-machine.md).
 Keep the SDK in a separate sibling folder. From this repository root:
