@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "id": "nightdrive",
+  "name": "Nightdrive",
+  "parameters": [
+    {
+      "id": "speed",
+      "label": "Speed",
+      "default": 0.25,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "tension",
+      "label": "Tension",
+      "default": 0.25,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "drift",
+      "label": "Drift",
+      "default": 0.35,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "glare",
+      "label": "Glare",
+      "default": 0.25,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    }
+  ],
+  "presets": {},
+  "resources": {
+    "voiceBytes": 64,
+    "voiceAlignment": 4,
+    "voiceCapacity": 256,
+    "sharedBytes": 0,
+    "outputPeakQ31": 402653184,
+    "display": {
+      "stateBytes": 56,
+      "stateAlignment": 4,
+      "paths": 4,
+      "points": 64,
+      "nodes": 63,
+      "palette": 16,
+      "texts": 0
+    }
+  }
+}

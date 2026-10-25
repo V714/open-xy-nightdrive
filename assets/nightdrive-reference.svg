@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="240" viewBox="0 0 480 240" role="img" aria-label="nightdrive OP-XY concept; animated center dashes, passing white curved streetlamp and static 1980s car">
+  <title>nightdrive — isometric v21 (80s nose, no handles)</title>
+  <desc>Animated vector UI based on v11. Both center dashes and a curved white streetlamp flow toward the lower-left corner along the roadway. Streetlamp wraps back to top only while fully outside the viewport; the car body stays in place while both visible right-side wheels spin clockwise.</desc>
+  <defs>
+    <clipPath id="scene"><rect x="0" y="23" width="480" height="217"/></clipPath>
+  </defs>
+
+  <!-- Native-sized 480x240 device image: no exterior bezel. -->
+  <rect width="480" height="240" fill="#000"/>
+  <g font-family="Arial,Helvetica,sans-serif">
+    <rect x="0" y="0" width="104" height="23" fill="#050505"/>
+    <rect x="104" y="0" width="94" height="23" fill="#38383c"/>
+    <rect x="198" y="0" width="95" height="23" fill="#535358"/>
+    <rect x="293" y="0" width="93" height="23" fill="#818186"/>
+    <rect x="386" y="0" width="94" height="23" fill="#efefef"/>
+    <text x="9" y="16" font-size="12.5" fill="#f4f4f4">nightdrive</text>
+    <text x="110" y="9.4" font-size="8" fill="#ddd">speed</text>
+    <text x="204" y="9.4" font-size="8" fill="#eee">drive</text>
+    <text x="299" y="9.4" font-size="8" fill="#eee">drift</text>
+    <text x="392" y="9.4" font-size="8" fill="#202020">lamps</text>
+    <g text-anchor="end" font-size="17">
+      <text x="190" y="21" fill="#fff">72</text>
+      <text x="285" y="21" fill="#fff">60</text>
+      <text x="379" y="21" fill="#fff">38</text>
+      <text x="474" y="21" fill="#171717">50</text>
+    </g>
+  </g>
+
+  <g clip-path="url(#scene)">
+    <!-- Global scene-only zoom-out: original v4 road coordinates unchanged. -->
+    <g transform="translate(240 132) scale(0.75) translate(-240 -132)">
+    <!-- A single planar road with mild perspective: 18% less visible width at top.
+         Both far corners extend BEYOND the top edge (y=23), avoiding a hard endpoint. -->
+    <path d="M-44 272 L406 -36 L518 -10 L95 313 Z" fill="#0b0b0c"/>
+
+    <!-- Long edges diverge gently toward the viewer; outer shoulders share their angles. -->
+    <g fill="none" stroke-linecap="square" stroke-linejoin="miter">
+      <path d="M-44 272 L406 -36" stroke="#ededed" stroke-width="1.45"/>
+      <path d="M95 313 L518 -10" stroke="#ededed" stroke-width="1.45"/>
+      <path d="M-54 266 L395 -41" stroke="#535359" stroke-width="0.85"/>
+      <path d="M105 319 L527 -4" stroke="#535359" stroke-width="0.85"/>
+    </g>
+
+    <!-- A single centered line ensures mathematically consistent movement.
+         The path is oriented from bottom-left to top-right. Increasing
+         dash offset moves the marks toward the bottom-left, in the driving
+         direction. Exactly one dash period per loop hides the seam. -->
+    <!-- ONE SPEED CONTROLLER: C++ updates both child animation durations from one speed value.
+         Native SVG does not propagate a custom speed attribute automatically.
+         At speed=1: road 0.14375 s / cycle, lamp 1.939125 s / cycle. -->
+    <g id="drive-motion" data-speed="1" data-lane-base-seconds="0.14375" data-lamp-base-seconds="1.939125">
+    <path id="road-markings" d="M25.5 292.5 L462 -23"
+          fill="none" stroke="#ededed" stroke-width="1.65"
+          stroke-linecap="butt" stroke-dasharray="21 32">
+      <animate id="road-markings-anim" attributeName="stroke-dashoffset" from="0" to="53"
+               dur="0.14375s" repeatCount="indefinite"/>
+    </path>
+
+    <!-- Curved streetlamp fixed to the LEFT kerb of the roadway.
+         Follows that kerb's exact geometric slope, at the same scene-space
+         speed as the center dashes: 53 units / 1.15 s = 46.087 units/s.
+         The full journey takes 15.513 s, including time outside frame.
+         At both ends, the entire shape is clipped off screen: no visible reset. -->
+    <g id="passing-lamp">
+      <path id="streetlamp" d="M0 0 V-92 Q0 -108 36 -88 H36"
+            fill="none" stroke="#fff" stroke-width="2.15"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <animateTransform id="streetlamp-anim" attributeName="transform" type="translate"
+           values="460.00 -72.96;-130.00 330.86"
+           dur="1.939125s" calcMode="linear" repeatCount="indefinite"/>
+    </g>
+    </g><!-- /drive-motion -->
+
+    <!-- PARKED IN VIEW: v13 body geometry with v14 black-fill / white-outline colors -->
+    <!-- Change this outer transform to move the entire car, including the spinning wheels. -->
+    <g id="car-position" transform="translate(0 0)" data-forward-unit="0.810 -0.586" data-side-unit="0.586 0.810">
+    <g id="static-car" aria-label="static boxy 1980s car, rear and right side visible">
+
+<polygon points="161.0,195.0 199.0,210.0 199.0,197.0 161.0,182.0" fill="#000000" stroke="#f1f1f1" stroke-width="1.1" stroke-linejoin="round" />
+<polygon points="199.0,210.0 267.0,160.0 267.0,148.0 247.2,159.0 199.0,197.0" fill="#000000" stroke="#f1f1f1" stroke-width="1.1" stroke-linejoin="round" />
+<polygon points="161.0,182.0 180.0,171.0 212.2,186.0 199.0,197.0" fill="#000000" stroke="#f1f1f1" stroke-width="0.9" stroke-linejoin="round" />
+<!-- v25 simplified flush hood, aligned to unchanged v24 car geometry. -->
+<polygon id="front-hood" points="214.5,146.2 231.8,133.0 267.0,148.0 247.2,159.0"
+         fill="#000000" stroke="none" />
+<path d="M214.5 146.2 L231.8 133.0 L267.0 148.0" fill="none" stroke="#f1f1f1" stroke-width="0.95" stroke-linejoin="round"/>
+<!-- car-windows owns all four glass surfaces. Roof remains explicitly black to preserve layering. -->
+<g id="car-windows" fill="#535358">
+<polygon points="177.8,172.0 212.5,185.9 216.9,167.8 186.5,155.8" stroke="#dedee0" stroke-width="0.9" stroke-linejoin="round" />
+<polygon points="208.2,140.0 238.6,152.0 247.2,159.0 214.5,146.2" stroke="#dedee0" stroke-width="0.9" stroke-linejoin="round" />
+<polygon points="186.5,155.8 208.2,140.0 238.6,152.0 216.9,167.8" fill="#000000" stroke="#f7f7f7" stroke-width="0.95" stroke-linejoin="round" />
+<polygon points="219.7,180.9 217.7,169.1 227.0,162.3 231.1,171.9" stroke="#e7e7e8" stroke-width="0.85" stroke-linejoin="round" />
+<polygon points="231.7,170.5 228.2,161.4 239.4,153.3 244.8,160.8" stroke="#e7e7e8" stroke-width="0.85" stroke-linejoin="round" />
+</g><!-- /car-windows -->
+
+<polygon points="162.6,188.6 168.9,191.1 168.9,188.1 162.6,185.6" fill="#545458" stroke="#dcdce0" stroke-width="0.45" stroke-linejoin="round" />
+<polygon points="189.4,199.2 195.7,201.7 195.7,198.7 189.4,196.2" fill="#545458" stroke="#dcdce0" stroke-width="0.45" stroke-linejoin="round" />
+<path d="M164.0 189.7 L196.0 202.3" fill="none" stroke="#aaaab0" stroke-width="0.7" stroke-linecap="round"/>
+<path d="M164.2 195.5 L194.6 207.5" fill="none" stroke="#bdbdc2" stroke-width="1.2" stroke-linecap="round"/>
+<polygon points="175.8,199.1 181.9,201.5 181.9,198.9 175.8,196.5" fill="#000000" stroke="#c1c1c5" stroke-width="0.45" stroke-linejoin="round" />
+
+
+<!-- Isometric wheel: fixed elliptical tyre and a rapidly clockwise-spinning hub -->
+<g transform="translate(212.3 198.5) rotate(-35)">
+  <ellipse cx="0" cy="0" rx="7.1" ry="4.2" fill="#000" stroke="#efeff0" stroke-width="1.25"/>
+  <g transform="scale(1 0.59155)">
+    <circle r="3.6" fill="#080808" stroke="#efeff0" stroke-width="1.05"/>
+    <g stroke="#cfcfd1" stroke-width="1.12" stroke-linecap="round" fill="none">
+      <path d="M-3.1 0 L-.85 0 M.85 0 L3.1 0 M0 -3.1 L0 -.85 M0 .85 L0 3.1 M-2.2 -2.2 L-.65 -.65 M.65 .65 L2.2 2.2"/>
+      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="0.22s" repeatCount="indefinite"/>
+    </g>
+    <circle r=".65" fill="#f6f6f6"/>
+  </g>
+</g>
+<!-- Isometric wheel: fixed elliptical tyre and a rapidly clockwise-spinning hub -->
+<g transform="translate(252.6 169.3) rotate(-35)">
+  <ellipse cx="0" cy="0" rx="6.9" ry="4.0" fill="#000" stroke="#efeff0" stroke-width="1.25"/>
+  <g transform="scale(1 0.57971)">
+    <circle r="3.6" fill="#080808" stroke="#efeff0" stroke-width="1.05"/>
+    <g stroke="#cfcfd1" stroke-width="1.12" stroke-linecap="round" fill="none">
+      <path d="M-3.1 0 L-.85 0 M.85 0 L3.1 0 M0 -3.1 L0 -.85 M0 .85 L0 3.1 M-2.2 -2.2 L-.65 -.65 M.65 .65 L2.2 2.2"/>
+      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="0.22s" repeatCount="indefinite"/>
+    </g>
+    <circle r=".65" fill="#f6f6f6"/>
+  </g>
+</g>
+    </g><!-- /static-car -->
+    </g><!-- /car-position -->
+    </g><!-- /scene zoom -->
+  </g>
+</svg>

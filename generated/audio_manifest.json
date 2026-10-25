@@ -1,0 +1,15 @@
+{
+  "sample_rate": 44100,
+  "oversampling": 1,
+  "stock_adsr_amplitude": true,
+  "internal_decay": false,
+  "max_overdrive_gain": 32,
+  "feedback_max_radians": 3,
+  "ratio_min": 0.25,
+  "ratio_max": 16,
+  "punch_ms": 25,
+  "modulation_transient_ms": 80,
+  "modulation_max_radians": 6,
+  "boost_starts_at": 0.7,
+  "tables_sha256": "7dccf6580a7e06418241b09613efe9924fb7cf6b966044f750b13b48c7df92e8"
+}

@@ -1,0 +1,79 @@
+name: Machine checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  OPEN_XY_REPOSITORY: etcetc000/open-xy
+  OPEN_XY_REF: fdf48e583ebb19fb5cd191687229bf77107f1aed
+jobs:
+  machines:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: nightdrive
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.OPEN_XY_REPOSITORY }}
+          ref: ${{ env.OPEN_XY_REF }}
+          path: open-xy-sdk
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Preview and host test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld
+          python -m pip install numpy==2.3.5 Pillow==12.0.0
+      - name: SDK machine checks
+        run: python open-xy-sdk/sdk.py test --machine nightdrive --cxx clang++ --host-cxx g++
+      - name: Engine signal and animation checks
+        run: |
+          python nightdrive/tests/check.py --sdk-root open-xy-sdk --out "$RUNNER_TEMP/nightdrive-checks" --cxx g++
+          python -O nightdrive/tests/check.py --sdk-root open-xy-sdk --out "$RUNNER_TEMP/nightdrive-checks-opt" --cxx g++
+      - name: Build review preview
+        run: python open-xy-sdk/sdk.py preview --machine nightdrive --out "$RUNNER_TEMP/nightdrive-preview"
+      - name: Upload review preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightdrive-preview
+          path: ${{ runner.temp }}/nightdrive-preview
+          if-no-files-found: error
+      - name: Upload engine check reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightdrive-check-reports
+          path: |
+            ${{ runner.temp }}/nightdrive-checks/report.json
+            ${{ runner.temp }}/nightdrive-checks/quality/report.json
+            ${{ runner.temp }}/nightdrive-checks-opt/report.json
+          if-no-files-found: error
+  firmware:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: nightdrive
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.OPEN_XY_REPOSITORY }}
+          ref: ${{ env.OPEN_XY_REF }}
+          path: open-xy-sdk
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Pinned Blackfin toolchain
+        run: python open-xy-sdk/sdk.py toolchain fetch
+      - name: Fetch the pinned catalog machines
+        run: python open-xy-sdk/sdk.py catalog fetch --tags
+      - name: Compile with the published catalog (no stock firmware)
+        run: python open-xy-sdk/sdk.py compile --collection open-xy-sdk/local/catalog/collection.json --machine nightdrive --out "${{ runner.temp }}/nightdrive-module"

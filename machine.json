@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "kind": "synth",
+  "description": "Feedback FM bass: outrun plucks, cyberpunk midtempo, and an isometric night drive.",
+  "identity": {
+    "engine": 49,
+    "page": 97
+  },
+  "sdk": "1.1"
+}
