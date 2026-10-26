@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 env:
   OPEN_XY_REPOSITORY: etcetc000/open-xy
-  OPEN_XY_REF: 1340b45838c8dc56abadf362faf7ce9966e6514a
+  OPEN_XY_REF: 6b2e4d10093584854adb86edce42c931b3bc0a7e
 jobs:
   machines:
     runs-on: ubuntu-latest

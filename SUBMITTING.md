@@ -1,59 +1,42 @@
-# Publishing Nightdrive 1.0.0
+# Publishing Nightdrive 1.0.1
 
-Nightdrive stays in this repository. The Open-XY contribution changes only `catalog/machines.json`
-in a pull request targeting `etcetc000/open-xy:staging`. Do not copy the engine into the SDK.
+Nightdrive stays in this repository. The Open-XY contribution changes only
+`catalog/machines.json` in a pull request targeting `etcetc000/open-xy:staging`.
 The official [catalog guide](https://github.com/etcetc000/open-xy/blob/staging/docs/catalog.md)
-is the authority for submission status and review.
+is the authority for submission and hardware profiling requirements.
 
 ## Publish the source
 
-Create an empty GitHub repository named `open-xy-nightdrive` under **V714**, without generated
-README, license or gitignore files. From this repository:
+This update adds device-saved presets and requires SDK 1.3. Push the source:
 
 ```sh
-git remote add origin https://github.com/V714/open-xy-nightdrive.git
-git push -u origin main
+git push origin main
 ```
 
-Wait for **Machine checks** to pass on GitHub, including the Windows native compile.
-Then tag that exact commit and publish it:
+Wait for **Machine checks** to pass, including the Windows native compile.
+Then tag that exact tested commit:
 
 ```sh
-git tag -a v1.0.0 -m "Nightdrive 1.0.0"
-git push origin v1.0.0
-git rev-parse 'v1.0.0^{commit}'
+git fetch origin --tags
+git tag -a v1.0.1 -m "Nightdrive 1.0.1: bundled presets"
+git push origin v1.0.1
+git rev-parse 'v1.0.1^{commit}'
 ```
 
-Keep the final command's full 40-character SHA. If review needs code changes after tagging,
-use a new version rather than moving an existing public tag.
+Use a new version if a tag already exists; never move a public tag. Keep the
+full commit SHA from the last command.
 
-## Request review
+## Update the catalog submission
 
-Check that `nightdrive` is still unused in the catalog. It was unused when this repository was
-prepared. The catalog can reserve an ID first with:
+Update the existing [Nightdrive PR #112](https://github.com/etcetc000/open-xy/pull/112)
+on its source branch `V714:patch-1`. In the `nightdrive` entry of
+`catalog/machines.json`, set `tag` to `v1.0.1` and `commit` to the full tested
+commit SHA. Preserve its ID, repository, root path `.` and review status.
+Commit that manifest edit on the same branch to update the existing PR.
+Only the catalog entry belongs in Open-XY; the presets remain in this repository.
 
-```json
-{ "id": "nightdrive", "kind": "synth", "maintainer": "V714", "status": "reserved" }
-```
-
-For a tagged release submitted for review, propose the following entry, replacing `FULL_COMMIT_SHA`
-with the tag's actual commit. `draft` pins the source for review without including it in released
-firmware; promotion to `published` belongs to the review process.
-
-```json
-{
-  "id": "nightdrive",
-  "kind": "synth",
-  "maintainer": "V714",
-  "status": "draft",
-  "repository": "https://github.com/V714/open-xy-nightdrive",
-  "tag": "v1.0.0",
-  "commit": "FULL_COMMIT_SHA",
-  "path": "."
-}
-```
-
-Open the PR against **staging**, changing only `catalog/machines.json`. Link the passing workflow
-and its preview artifact. Describe Speed (ratio), Tension (feedback), Drift (modulation and transient),
-and Glare (overdrive and Punch), and the note-driven animation. The code and artwork are MIT licensed
-by Tomasz Lipczyński (V7 / GitHub V714), with the preserved Open-XY notice.
+Mention that this update adds four presets using the SDK 1.3 `presets` field
+without changing DSP code. Follow the catalog's current requirements for any
+revision-bound hardware CPU readout; host estimates do not replace it.
+The public builder picks up the new files after catalog acceptance and deployment.
+For local testing, export a fresh personal kit with SDK 1.3 and this machine.
