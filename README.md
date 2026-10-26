@@ -1,6 +1,6 @@
 # Nightdrive
 
-Version **1.0.0** · Author and maintainer: **Tomasz Lipczyński (V7)** · GitHub: [**V714**](https://github.com/V714) · MIT licensed.
+Version **1.0.1** · Author and maintainer: **Tomasz Lipczyński (V7)** · GitHub: [**V714**](https://github.com/V714) · MIT licensed.
 
 A four-control feedback FM bass synthesizer for OP-XY, with an animated isometric night-drive scene.
 The source targets Open-XY SDK 1.1 and later compatible 1.x releases, for stock OS 1.2.0. Audio is mono Q31 at 44.1 kHz, in 64-sample
