@@ -1,13 +1,5 @@
 # Nightdrive
 
-Experimental output-shaper candidate: a 33 × 129 bilinear LUT replaces the
-Glare saturation calculation. Its packed Q15 samples occupy 8,514 bytes.
-FM, feedback, control mappings and output gain are unchanged, but output samples
-and the downstream DC-filter state are not identical to the exact engine.
-The exact transfer function is retained for table generation and checks.
-Compare A/B audio before choosing this candidate for regular use.
-
-
 Version **1.0.0** · Author and maintainer: **Tomasz Lipczyński (V7)** · GitHub: [**V714**](https://github.com/V714) · MIT licensed.
 
 A four-control feedback FM bass synthesizer for OP-XY, with an animated isometric night-drive scene.
