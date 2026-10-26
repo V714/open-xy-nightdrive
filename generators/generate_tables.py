@@ -28,16 +28,29 @@ def main():
         )
 
     x = np.arange(257) / 256
-    table("audio_sine_lut", np.sin(np.arange(2048) / 2048 * 2 * np.pi) * 32760, "opxy::i16")
+    sine_values = np.rint(np.sin(np.arange(2048) / 2048 * 2 * np.pi) * 32760).astype(np.int64)
+    table("audio_sine_lut", sine_values, "opxy::i16")
+    deltas = np.roll(sine_values, -1) - sine_values
+    table("sine_delta_lut", deltas, "opxy::i16")
+    table("sine_packed_lut", (sine_values & 65535) | ((deltas & 65535) << 16), "opxy::u32")
     table(
         "ratio_lut",
         2 ** np.interp(np.arange(101), [0, 5, 10, 25, 50, 75, 100], [-2, -1, 0, 1, 2, 3, 4])
         * (1 << 26),
     )
     ramp = np.maximum(0, (x - 0.7) / 0.3) ** 2
-    table("feedback_boost_lut", 2.15 * ramp / (2 * np.pi) * (1 << 32))
+    table("feedback_boost_lut", 2.15 * (x / (16 - 15 * x)) / (2 * np.pi) * (1 << 32))
+    # Preserve the exact former Q31 result at full Tension, including interpolation rounding.
+    text += "static const opxy::i32 feedback_maximum = 2050695520;\n"
+    table("punch_lut", (x + 0.15 * x * (1 - x)) * Q)
     table("modulation_boost_lut", 2 * ramp / (2 * np.pi) * (1 << 31))
-    table("tanh_lut", 0.5 * np.tanh(np.arange(1025) / 128) * Q)
+    tanh_values = np.rint(0.5 * np.tanh(np.arange(1025) / 128) * Q).astype(np.int64)
+    table("tanh_lut", tanh_values)
+    table("tanh_delta_lut", np.diff(tanh_values))
+    # Exact result of interpolation at the clamped position 0x1fffffff.
+    clipped = int(tanh_values[-2]) + ((int(tanh_values[-1]) - int(tanh_values[-2])) *
+                                     (0x7ffff << 12) // (1 << 31))
+    text += "static const opxy::i32 tanh_clipped = " + str(clipped) + ";\n"
     table("drive_comp_lut", (1 / (1 + 0.08 * x)) * Q)
     write_header(HERE / "tables.h", text + "}\n")
     (HERE / "generated").mkdir(exist_ok=True)
@@ -55,7 +68,9 @@ def main():
                 punch_ms=25,
                 modulation_transient_ms=80,
                 modulation_max_radians=6,
-                boost_starts_at=0.7,
+                feedback_curve=dict(kind="rational", k=16, starts_at=0),
+                modulation_boost_starts_at=0.7,
+                punch_curve=dict(kind="polynomial", amount=0.15),
                 tables_sha256=hashlib.sha256((HERE / "tables.h").read_bytes()).hexdigest(),
             ),
             indent=2,

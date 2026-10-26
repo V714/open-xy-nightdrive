@@ -12,6 +12,18 @@ def compare(baseline, sdk, out, compiler, baseline_sdk=None):
     from check import compile_test
 
     out.mkdir(parents=True, exist_ok=False)
+    exact = {}
+    for tag, source in [("before", baseline), ("after", MACHINE)]:
+        binary = out / (tag + "-exact")
+        compile_test(MACHINE / "tests/helpers/exact_render.cpp", binary,
+                     baseline_sdk if tag == "before" and baseline_sdk else sdk,
+                     compiler, source)
+        raw = out / (tag + "-exact.q31")
+        result = subprocess.run([str(binary), str(raw)], check=True, text=True, capture_output=True)
+        exact[tag] = hashlib.sha256(raw.read_bytes()).hexdigest()
+        print(tag + ": " + result.stdout.strip())
+    if exact["before"] != exact["after"]:
+        raise RuntimeError("Exact corpus changed: audio or persistent voice state")
     binaries = {}
     for tag, source in [("before", baseline), ("after", MACHINE)]:
         binaries[tag] = {}
@@ -85,6 +97,7 @@ def compare(baseline, sdk, out, compiler, baseline_sdk=None):
     if structure(before) != structure(after):
         raise RuntimeError("Static artwork changed")
     result = {
+        "exact_corpus_sha256": exact["after"],
         "exact_audio_cases": count,
         "visible_frame_cases": 5,
         "offscreen_parking_normalized": True,

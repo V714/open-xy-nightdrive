@@ -1,0 +1,14 @@
+{
+  "mode": "dense",
+  "rows": 33,
+  "columns": 129,
+  "table_bytes": 8514,
+  "experimental": true,
+  "packed_q15": true,
+  "full_engine_limit_bytes": 71680,
+  "reference_sources": {
+    "dsp.h": "13d77470ac774a738e8150d0b489d9502b579b90471b12780c3d66e4c24919ea",
+    "tables.h": "251ce1ccf8aae4cbe8f29112949358184d71b769d5fdf04696ef0866055d8e35"
+  },
+  "header_sha256": "1c073b6406d9ea9f8113aad30a168bb89bfe547cba245db4daaee8d977a6d646"
+}

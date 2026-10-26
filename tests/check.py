@@ -49,7 +49,7 @@ def main():
         parser.error("Keep generated checks outside the machine folder")
     out.mkdir(parents=True, exist_ok=False)
     report = {"hardware_tested": False, "device_cycles_measured": False, "checks": {}}
-    for name in ["range_test", "envelope_test", "display_test", "sound_test"]:
+    for name in ["range_test", "envelope_test", "display_test", "sound_test", "response_test", "saturation_test", "table_differences_test", "shaper_table_test"]:
         binary = out / name
         compile_test(MACHINE / "tests" / (name + ".cpp"), binary, sdk, args.cxx)
         command = [str(binary)]

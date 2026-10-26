@@ -31,13 +31,13 @@ int main() {
         previousFb = fb;
         previousMod = mod;
         if (k <= 690) {
-            require(fb == dsp::multiply(c, 581030184), "low feedback range changed");
+            require(k == 0 || fb > dsp::multiply(c, 581030184), "early feedback boost missing");
             require(mod == dsp::multiply(c, 1367130551), "low modulation range changed");
         }
     }
     double fb = dsp::feedback_amount(2147483647) / 4294967296. * (2 * 3.141592653589793),
            mod = dsp::modulation_amount(2147483647) / 2147483648. * (2 * 3.141592653589793);
     require(std::fabs(fb - 3.0) < .000001 && std::fabs(mod - 6) < .000001, "wrong maximum radians");
-    std::puts(
-        "PASS Nightdrive ranges: monotonic, lower 69% identical, feedback 3rad, modulation 6rad");
+    std::puts("PASS Nightdrive ranges: monotonic, early feedback boost, lower Drift unchanged, "
+              "feedback 3rad, modulation 6rad");
 }

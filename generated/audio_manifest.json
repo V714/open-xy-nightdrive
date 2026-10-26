@@ -10,6 +10,15 @@
   "punch_ms": 25,
   "modulation_transient_ms": 80,
   "modulation_max_radians": 6,
-  "boost_starts_at": 0.7,
-  "tables_sha256": "7dccf6580a7e06418241b09613efe9924fb7cf6b966044f750b13b48c7df92e8"
+  "feedback_curve": {
+    "kind": "rational",
+    "k": 16,
+    "starts_at": 0
+  },
+  "modulation_boost_starts_at": 0.7,
+  "punch_curve": {
+    "kind": "polynomial",
+    "amount": 0.15
+  },
+  "tables_sha256": "251ce1ccf8aae4cbe8f29112949358184d71b769d5fdf04696ef0866055d8e35"
 }

@@ -1,5 +1,13 @@
 # Nightdrive
 
+Experimental output-shaper candidate: a 33 × 129 bilinear LUT replaces the
+Glare saturation calculation. Its packed Q15 samples occupy 8,514 bytes.
+FM, feedback, control mappings and output gain are unchanged, but output samples
+and the downstream DC-filter state are not identical to the exact engine.
+The exact transfer function is retained for table generation and checks.
+Compare A/B audio before choosing this candidate for regular use.
+
+
 Version **1.0.0** · Author and maintainer: **Tomasz Lipczyński (V7)** · GitHub: [**V714**](https://github.com/V714) · MIT licensed.
 
 A four-control feedback FM bass synthesizer for OP-XY, with an animated isometric night-drive scene.
@@ -15,10 +23,17 @@ blocks, without oversampling. This folder is the canonical source for further Ni
 | Drift   | Phase-modulation depth, up to 6 radians     | Moves the car toward the left lane |
 | Glare   | Compensated overdrive up to 32×, plus Punch | Brightens the four windows         |
 
-Tension and Drift extend their upper ranges mainly between 70 and 100. The lower ranges retain their
-original response. Twenty percent clean fundamental reinforces the bass. FM and feedback decrease
-at high frequencies to limit nonlinear bandwidth. A note starts a finite 80 ms modulation transient controlled by Drift and a 25 ms
-pre-overdrive Punch transient controlled by Glare. At zero, each corresponding transient is bypassed.
+Tension's extra feedback boost starts above zero and follows the rational curve
+`x / (16 - 15*x)`: very gentle at the bottom and steep near the top. Its full-scale
+feedback remains 3 radians. Drift keeps its quadratic upper-range extension
+between 70 and 100. Twenty percent clean fundamental reinforces the bass.
+FM and feedback decrease at high frequencies to limit nonlinear bandwidth.
+A note starts a finite 80 ms modulation transient controlled by Drift and a
+25 ms pre-overdrive Punch transient controlled by Glare. Punch uses
+`x + 0.15*x*(1-x)` for a modest increase at low settings, retaining zero and its
+former full-scale amount. Glare's saturation mapping is unchanged. Both
+transients are bypassed at zero. These are changes to the existing feedback
+and Punch; there is no separate noise generator.
 There is no internal amplitude decay: note length and sustain follow the device's stock ADSR. There are no alternate controls.
 No named presets are distributed. The four control defaults provide the initial sound.
 The SDK builder may generate its standard init preset from these defaults.
@@ -40,7 +55,7 @@ SDK-owned 20-pixel header. The reference artwork lives in `assets/`.
 
 This is a standalone machine repository. It contains no SDK, stock firmware or stock content.
 The machine is at the repository root; its catalog path is `.`. Minimum supported SDK: **1.1**.
-CI checks against Open-XY staging commit `fdf48e583ebb19fb5cd191687229bf77107f1aed`
+CI checks against Open-XY staging commit `1340b45838c8dc56abadf362faf7ce9966e6514a`
 (SDK 1.2, compatible with this machine's SDK 1.1 contract).
 
 ### Quick installation
@@ -87,7 +102,7 @@ Keep the SDK in a separate sibling folder. From this repository root:
 
 ```sh
 git clone https://github.com/etcetc000/open-xy.git ../open-xy-sdk
-git -C ../open-xy-sdk checkout fdf48e583ebb19fb5cd191687229bf77107f1aed
+git -C ../open-xy-sdk checkout 1340b45838c8dc56abadf362faf7ce9966e6514a
 python -m pip install -r requirements-dev.txt
 python ../open-xy-sdk/sdk.py test --machine . --cxx clang++ --host-cxx g++
 python ../open-xy-sdk/sdk.py preview --machine . --out ../nightdrive-preview-001
@@ -176,3 +191,46 @@ stable two-space layout. Source SVG path data is excluded from automatic rewriti
 Code and artwork are MIT licensed; see `LICENSE`. Preserve the Open-XY and Tomasz Lipczyński copyright
 notices when redistributing. The Open-XY SDK remains a separate MIT-licensed dependency. No stock
 firmware, stock artwork or third-party audio samples are included.
+
+## CPU analysis without firmware
+
+The packed sine lookup and existing FM fast paths retain their Q31 rounding.
+The output shaper samples the exact compensated Glare transfer function on a
+33 × 129 grid. Amplitude interpolation uses a 16-bit fraction and an integer
+product; interpolation between Glare rows retains Q31 precision. At zero Glare
+it returns the input exactly. Oscillator and feedback updates are unchanged,
+including when modulation bandwidth reaches zero. Smoothing still runs at the
+original sample rate. No per-voice cache or additional state is required.
+
+`tests/analyze_blackfin.py --sdk-root <sdk> --out <fresh-dir>
+--approximate-saturation` checks the Linux tool hashes and emits assembly and stack
+usage with the SDK's compiler flags. It does not assemble objects or link
+firmware. Static instruction counts are not device cycles. The compiler must
+be built as described in the SDK's Linux toolchain guide.
+`tests/profile_dsp.py` measures host component timings; `tests/paired_cpu.py`
+alternates two already-built benchmark directories in two series of five runs.
+
+Experimental output-shaper approximations use `tests/approximation_check.py
+--sdk-root <sdk> --baseline <exact-machine> --out <fresh-dir>`. It requires
+relative error at most -55 dB by default for full notes, attacks and sustain, bounded peaks,
+and exact oscillator/feedback state. A/B files are written only when those
+checks pass. Five-second holds, slow/fast Glare sweeps and exact Glare-zero
+output are also checked. Approval by these metrics does not replace listening.
+Auditions play the exact reference first, then this candidate, with matched
+RMS levels and a short gap; they do not emulate stock ADSR.
+
+Regenerate the candidate table from the explicit exact reference:
+
+```sh
+python generators/generate_approximation.py --sdk-root <sdk> \
+  --reference <exact-nightdrive> --mode dense --drive-bits 5 --amplitude-bits 7 --packed
+```
+
+`tests/measure_native_size.py --sdk-root <sdk> --machine <machine> --out
+<external-private-directory>` measures owned Blackfin code/data/BSS including
+the adapters and all native voice slots, without linking firmware.
+Shared SDK overhead and the separate SVG asset are reported separately.
+Prefer at most 70 KiB; 80 KiB is reserved for a material CPU improvement below
+15,000 in the host estimator. `tests/broad_cpu.py --sdk-root <sdk> --build
+<cpu-benchmark-directory>` adds all integer Glare values, control corners and
+seeded joint patches. These diagnostics do not establish device timing.
