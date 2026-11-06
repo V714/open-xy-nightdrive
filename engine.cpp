@@ -48,7 +48,10 @@ struct StableCoefficients {
 template <bool ConstantPitch, bool ModTransient, bool Punch, bool ZeroModulation>
 static inline void render_range(Voice &voice, opxy::Output output, opxy::Pitch pitch,
                                 unsigned begin, unsigned end, const StableCoefficients &prepared) {
-    const i32 *controls = voice.controls;
+    const i32 drift = voice.controls[2];
+    u32 carrier = voice.carrier, modulator = voice.modulator, age = voice.transientAge;
+    i32 feedback0 = voice.feedback[0], feedback1 = voice.feedback[1];
+    i32 previous = voice.prev, dc = voice.dc;
     PitchFactors factors = prepared.pitch;
     for (unsigned i = begin; i < end; ++i) {
         const u32 increment = pitch[i];
@@ -56,38 +59,45 @@ static inline void render_range(Voice &voice, opxy::Output output, opxy::Pitch p
             factors =
                 pitch_factors(increment, prepared.ratio, prepared.feedback, prepared.modulation);
         // Keep both Q31 rounding stages identical to the original render.
-        i32 fboffset = multiply(voice.feedback[0] + voice.feedback[1], factors.feedback);
-        i32 modulatorSignal = sine(voice.modulator + u32(fboffset));
-        voice.feedback[1] = voice.feedback[0];
-        voice.feedback[0] = modulatorSignal;
+        i32 fboffset = multiply(feedback0 + feedback1, factors.feedback);
+        i32 modulatorSignal = sine(modulator + u32(fboffset));
+        feedback1 = feedback0;
+        feedback0 = modulatorSignal;
 
         i32 phaseModulation =
             ZeroModulation ? 0 : multiply(modulatorSignal * 2, factors.modulation);
         // Linear finite transients leave steady sustain entirely to stock ADSR.
         u32 transientPhase = 0;
         if (ModTransient && !ZeroModulation) {
-            i32 envelope = i32(3528 - voice.transientAge) * 608697;
-            transientPhase = u32(multiply(phaseModulation, multiply(controls[2], envelope)));
+            i32 envelope = i32(3528 - age) * 608697;
+            transientPhase = u32(multiply(phaseModulation, multiply(drift, envelope)));
         }
-        const i32 fundamental = sine(voice.carrier);
+        const i32 fundamental = sine(carrier);
         const u32 phaseOffset = u32(phaseModulation) * 2u + transientPhase;
         i32 signal = fundamental;
         if (!ZeroModulation) {
-            const i32 modulatedSignal = sine(voice.carrier + phaseOffset);
+            const i32 modulatedSignal = sine(carrier + phaseOffset);
             signal = modulatedSignal - multiply(modulatedSignal, 429496729) +
                      multiply(fundamental, 429496729);
         }
         if (Punch) {
-            i32 envelope = i32(1103 - voice.transientAge) * 1946948;
+            i32 envelope = i32(1103 - age) * 1946948;
             signal += multiply(signal, multiply(prepared.punch, envelope)) / 2;
         }
         signal = apply_shaper(signal, prepared.shaper);
         if (ModTransient)
-            ++voice.transientAge;
-        output[i] = clamp(dc_block(signal, voice.prev, voice.dc) / 4, -402653184, 402653184);
-        voice.carrier += increment;
-        voice.modulator += factors.modulator;
+            ++age;
+        output[i] = clamp(dc_block(signal, previous, dc) / 4, -402653184, 402653184);
+        carrier += increment;
+        modulator += factors.modulator;
     }
+    voice.carrier = carrier;
+    voice.modulator = modulator;
+    voice.transientAge = age;
+    voice.feedback[0] = feedback0;
+    voice.feedback[1] = feedback1;
+    voice.prev = previous;
+    voice.dc = dc;
 }
 // Split only at the original sample boundaries; state updates keep their order.
 template <bool ConstantPitch, bool ZeroModulation>
