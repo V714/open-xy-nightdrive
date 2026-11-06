@@ -96,6 +96,7 @@ static inline i32 saturate(i32 x, i32 drive) {
         return x;
     return saturate(x, drive, multiply(drive, drive), lut(drive_comp_lut, drive));
 }
+static const bool use_packed_shaper = false;
 // Experimental bilinear output-shaper LUT: no change to oscillator or feedback state.
 [[gnu::always_inline]] static inline i32 interpolate_segment(u32 segment, u32 amplitude) {
     const unsigned shift = 31 - shaper_amplitude_bits;
@@ -106,7 +107,12 @@ static inline i32 saturate(i32 x, i32 drive) {
     const unsigned shift = 31 - shaper_amplitude_bits;
     const unsigned column = amplitude >> shift;
     if (shaper_scale == 65536) {
-        return interpolate_segment(shaper_segments[row][column], amplitude);
+        if (use_packed_shaper)
+            return interpolate_segment(shaper_segments[row][column], amplitude);
+        const i32 base = shaper_lut[row][column];
+        const i32 delta = i32(shaper_lut[row][column + 1]) - base;
+        const opxy::u16 fraction = opxy::u16(amplitude >> (shift - 16));
+        return base * 65536 + delta * i32(fraction);
     }
     const i32 fraction = i32((amplitude & ((1u << shift) - 1)) << shaper_amplitude_bits);
     return mix(shaper_lut[row][column], shaper_lut[row][column + 1], fraction);
@@ -126,20 +132,23 @@ struct PreparedShaper {
         ++row;
         fraction = 0;
     }
-    return {shaper_scale == 65536 ? shaper_segments[row] : nullptr,
-            shaper_scale == 65536 && fraction ? shaper_segments[row + 1] : nullptr, row,
-            i32(fraction)};
+    return {use_packed_shaper && shaper_scale == 65536 ? shaper_segments[row] : nullptr,
+            use_packed_shaper && shaper_scale == 65536 && fraction ? shaper_segments[row + 1]
+                                                                   : nullptr,
+            row, i32(fraction)};
 }
 [[gnu::always_inline]] static inline i32 apply_shaper(i32 x, const PreparedShaper &shaper) {
     if (shaper.row == ~0u)
         return x;
     const u32 amplitude = u32(x < 0 ? -x : x);
     const unsigned column = amplitude >> (31 - shaper_amplitude_bits);
-    i32 value = shaper_scale == 65536 ? interpolate_segment(shaper.segments[column], amplitude)
-                                      : shaper_row(shaper.row, amplitude);
+    i32 value = use_packed_shaper && shaper_scale == 65536
+                    ? interpolate_segment(shaper.segments[column], amplitude)
+                    : shaper_row(shaper.row, amplitude);
     if (shaper.fraction) {
-        const i32 next = shaper_scale == 65536 ? interpolate_segment(shaper.next[column], amplitude)
-                                               : shaper_row(shaper.row + 1, amplitude);
+        const i32 next = use_packed_shaper && shaper_scale == 65536
+                             ? interpolate_segment(shaper.next[column], amplitude)
+                             : shaper_row(shaper.row + 1, amplitude);
         value = mix(value, next, shaper.fraction);
     }
     return x < 0 ? -value : value;
