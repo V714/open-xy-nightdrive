@@ -2,6 +2,9 @@
 
 Version **1.0.2** · Author and maintainer: **Tomasz Lipczyński (V7)** · GitHub: [**V714**](https://github.com/V714) · MIT licensed.
 
+**Experimental performance branch after v1.0.2:** output carrier sines may differ within
+a tested relative RMS error limit of -55 dB. The feedback oscillator remains exact.
+
 A four-control feedback FM bass synthesizer for OP-XY, with an animated isometric night-drive scene.
 The source targets Open-XY SDK 1.3 and later compatible 1.x releases, for stock OS 1.2.1. Audio is mono Q31 at 44.1 kHz, in 64-sample
 blocks, without oversampling. This folder is the canonical source for further Nightdrive development.
@@ -189,21 +192,23 @@ firmware, stock artwork or third-party audio samples are included.
 
 ## CPU analysis without firmware
 
-The packed sine lookup and existing FM fast paths retain their Q31 rounding.
-The output shaper samples the exact compensated Glare transfer function on a
-33 × 129 grid. Each of its 33 × 128 segments stores the original Q15 base and
-its exact slope in one 32-bit word, reducing interpolation to one table load.
-Amplitude interpolation uses a 16-bit fraction and an integer
-product; interpolation between Glare rows retains Q31 precision. The reference
-grid remains available to tests and is discarded from production objects. At zero Glare
-it returns the input exactly. Oscillator and feedback updates are unchanged,
-including when modulation bandwidth reaches zero. Smoothing still runs at the
-original sample rate. Automation snapshots its targets once per block and updates
-only the coefficients whose controls move. Fixed pitch factors are reused when
-Speed and pitch stay fixed, and a separate full-automation loop avoids partial-update
-checks when all four controls move. Audio and persistent state are checked bit for
-bit against an explicit baseline, including block-rate automation and settling.
-No per-voice cache or additional state is required.
+The feedback oscillator retains its original packed sine lookup and Q31 rounding.
+Output carrier sines use the nearest of 8192 phase positions, stored as 2049
+quarter-wave Q15 nodes (4098 bytes). This removes interpolation multiplications
+from the output oscillators; oscillator phase, feedback and controls stay exact.
+Regenerate it with `python generators/generate_audio_sine.py`.
+
+Glare uses the original 33 × 129 Q15 grid with the exact former 16-bit amplitude
+interpolation fraction. Its packed segment representation remains in the generated
+header for reference checks and is discarded from production. Stable controls
+prepare pitch coefficients and Glare rows once per block, reusing them across
+transient boundaries. Audio state is held locally inside each sample range.
+Voice remains 64 bytes; there is no derived per-voice coefficient cache.
+
+Smoothing runs at the original sample rate. Automation snapshots targets once per
+block and updates only coefficients whose controls move. A full-automation loop
+avoids partial-update tests when all four controls move. Range, phase, feedback,
+control state and output peaks are checked independently of audio approximation.
 
 After the finite timbre transient finishes, Speed automation and automation of
 three or four controls plan coefficients in two 32-sample spans before running
@@ -223,14 +228,19 @@ be built as described in the SDK's Linux toolchain guide.
 `tests/profile_dsp.py` measures host component timings; `tests/paired_cpu.py`
 alternates two already-built benchmark directories in two series of five runs.
 
-Experimental output-shaper approximations use `tests/approximation_check.py
---sdk-root <sdk> --baseline <exact-machine> --out <fresh-dir>`. It requires
-relative error at most -55 dB by default for full notes, attacks and sustain, bounded peaks,
-and exact oscillator/feedback state. A/B files are written only when those
-checks pass. Five-second holds, slow/fast Glare sweeps and exact Glare-zero
-output are also checked. Approval by these metrics does not replace listening.
-Auditions play the exact reference first, then this candidate, with matched
-RMS levels and a short gap; they do not emulate stock ADSR.
+`tests/approximation_check.py --sdk-root <sdk> --baseline <v1.0.2-source>
+--audio-oscillator --out <fresh-dir>` requires relative RMS error at most -55 dB
+for each full note, attack and sustain, bounded peaks and exact phase, feedback
+and control state. Five-second holds and slow/fast Glare sweeps are also checked.
+The explicit `--audio-oscillator` option allows bounded audio differences at
+Glare zero; without it, Glare zero must remain bit exact for shaper-only changes.
+`tests/automation_quality.py` applies the same limit separately to every one of
+900 automation cases and their attack, transient and sustain regions. Its state
+check excludes the two output-dependent DC-filter state values.
+
+A/B files are exported only when the note quality gate passes. They play the
+reference first and candidate second, with matched RMS and a short gap. These
+metrics do not replace listening or hardware CPU profiling.
 
 Regenerate the candidate table from the explicit exact reference:
 
@@ -243,7 +253,9 @@ python generators/generate_approximation.py --sdk-root <sdk> \
 <external-private-directory>` measures owned Blackfin code/data/BSS including
 the adapters and all native voice slots, without linking firmware.
 Shared SDK overhead and the separate SVG asset are reported separately.
-Prefer at most 70 KiB; 80 KiB is reserved for a material CPU improvement below
-15,000 in the host estimator. `tests/broad_cpu.py --sdk-root <sdk> --build
+The current native engine budget is at most 90 KiB, including adapters, all
+native voice slots and alignment allowance. Installed SVG, shared SDK overhead,
+caller stack and preset files are separate from that budget. The size audit
+enforces the native limit and also reports the complete installed SVG. `tests/broad_cpu.py --sdk-root <sdk> --build
 <cpu-benchmark-directory>` adds all integer Glare values, control corners and
 seeded joint patches. These diagnostics do not establish device timing.

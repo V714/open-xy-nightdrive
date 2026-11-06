@@ -7,10 +7,10 @@
   "packed_segment_slopes": true,
   "experimental": true,
   "packed_q15": true,
-  "full_engine_limit_bytes": 71680,
   "reference_sources": {
     "dsp.h": "33155f628dcfa05ae56b847e4cb4c4e0eae56a58f796ba6e69c8fc6fa6adb6e7",
     "tables.h": "251ce1ccf8aae4cbe8f29112949358184d71b769d5fdf04696ef0866055d8e35"
   },
-  "header_sha256": "cb140e384abe84b27ab93421a63de3052e83192b5eb56b2df213ca53490d1005"
+  "header_sha256": "cb140e384abe84b27ab93421a63de3052e83192b5eb56b2df213ca53490d1005",
+  "native_engine_limit_bytes": 92160
 }

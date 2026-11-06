@@ -2,6 +2,7 @@
 #include "core.h"
 #include "tables.h"
 #include "approx_lut.h"
+#include "audio_sine_lut.h"
 #include <opxy/q31.hpp>
 namespace nightdrive {
 namespace dsp {
@@ -21,15 +22,14 @@ static inline i32 sine(u32 p) {
     const i32 delta = i32(opxy::i16(packed >> 16)) * 32768;
     return a + multiply(delta, i32((p & 0x1fffffu) << 10));
 }
-// Degree-five audio-only sine approximation. Feedback keeps the exact lookup.
+// Nearest of 8192 phase positions; quarter-wave storage. Feedback keeps exact lookup.
 static inline i32 sine_audio(u32 phase) {
-    const u32 half = phase & 0x7fffffffu;
-    const u32 folded = half <= 0x40000000u ? half : 0x80000000u - half;
-    const i32 x = folded == 0x40000000u ? 2147483647 : i32(folded << 1);
-    const i32 squared = multiply(x, x);
-    const i32 polynomial = 1685724150 + multiply(squared, -689293677 + multiply(squared, 77049207));
-    const i32 signal = multiply(x, polynomial);
-    return phase & 0x80000000u ? -signal : signal;
+    const u32 position = (phase + 0x00040000u) >> 19;
+    unsigned index = position & 2047u;
+    if (position & 2048u)
+        index = 2048u - index;
+    const i32 signal = i32(audio_sine_quarter_lut[index]) * 32768;
+    return position & 4096u ? -signal : signal;
 }
 static inline i32 lut(const i32 *table, i32 control) {
     unsigned j = u32(control) >> 23;

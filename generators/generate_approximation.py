@@ -57,8 +57,8 @@ def main():
     packed = args.packed and args.mode == "dense"
     element_bytes = 2 if packed else 4
     runtime_bytes = rows * (columns - 1) * 4 if packed else rows * columns * element_bytes
-    if runtime_bytes > 70 * 1024:
-        parser.error("Table alone exceeds the 70 KiB engine budget; use a smaller grid")
+    if runtime_bytes > 90 * 1024:
+        parser.error("Table alone exceeds the 90 KiB native engine budget; use a smaller grid")
     source = '#include "dsp.h"\n#include <cstdio>\nint main() { ' + body + "\n}\n"
     with tempfile.TemporaryDirectory(prefix="nightdrive-shaper-") as temporary:
         folder = Path(temporary)
@@ -125,7 +125,7 @@ def main():
         "packed_segment_slopes": packed,
         "experimental": True,
         "packed_q15": packed,
-        "full_engine_limit_bytes": 70 * 1024,
+        "native_engine_limit_bytes": 90 * 1024,
         "reference_sources": {
             name: hashlib.sha256((reference / name).read_bytes()).hexdigest()
             for name in ("dsp.h", "tables.h")

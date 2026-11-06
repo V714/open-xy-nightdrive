@@ -2,6 +2,7 @@
 
 Objects must stay outside every checkout. No linking, stock OS or firmware image.
 """
+
 from pathlib import Path
 import argparse
 import hashlib
@@ -17,9 +18,9 @@ def main():
     args = parser.parse_args()
     sdk, out = args.sdk_root.resolve(), args.out.resolve()
     sys.path.insert(0, str(sdk))
-    from tooling import adapters
+    from tooling import adapters, screen
     from tooling.machines import machine_at
-    from tooling.native import compiler_paths, compile_cxx, includes, object_memory
+    from tooling.native import compiler_paths, compile_cxx, includes, object_memory, validate_panel
     from tooling.pipeline import tool_paths
     from tooling.formats import elf_sections
     from tooling.release import outside_checkouts
@@ -33,23 +34,37 @@ def main():
     tools = tool_paths(sdk / "local/toolchain/bin")
     out.mkdir(parents=True, exist_ok=False)
     adapters.generate_display(out, machine=machine)
-    sources = {"voice": adapters.generate_voice(out, machine),
-               "display": out / "display_binding.cpp",
-               "screen": adapters.generate_screen(out, machine),
-               "registration": adapters.generate_registration(out, machine)}
-    report = {"machine": str(machine.root), "units": {}, "initialized_bytes": 0,
-              "state_bytes": 0, "alignment_allowance": 0, "firmware_built": False,
-              "metric": "SDK engine-owned code/data/BSS, including native adapters and all voice slots; excludes shared SDK and SVG",
-              "sources": {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-                          for p in sorted(machine.root.iterdir()) if p.suffix in (".h", ".cpp", ".json")}}
+    sources = {
+        "voice": adapters.generate_voice(out, machine),
+        "display": out / "display_binding.cpp",
+        "screen": adapters.generate_screen(out, machine),
+        "registration": adapters.generate_registration(out, machine),
+    }
+    report = {
+        "machine": str(machine.root),
+        "units": {},
+        "initialized_bytes": 0,
+        "state_bytes": 0,
+        "alignment_allowance": 0,
+        "firmware_built": False,
+        "metric": "SDK engine-owned code/data/BSS, including native adapters and all voice slots; excludes shared SDK and SVG",
+        "sources": {
+            p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in sorted(machine.root.iterdir())
+            if p.suffix in (".h", ".cpp", ".json")
+        },
+    }
     for name, source in sources.items():
         obj = out / (name + ".o")
         compile_cxx(cxx, tools["as"], source, obj, includes(machine))
         data = obj.read_bytes()
         initialized, state = object_memory(data)
         allowance = sum(max(0, h[8] - 1) for _, h in elf_sections(data) if h[2] & 2 and h[5])
-        report["units"][name] = {"initialized_bytes": initialized, "state_bytes": state,
-                                  "alignment_allowance": allowance}
+        report["units"][name] = {
+            "initialized_bytes": initialized,
+            "state_bytes": state,
+            "alignment_allowance": allowance,
+        }
         report["initialized_bytes"] += initialized
         report["state_bytes"] += state
         report["alignment_allowance"] += allowance
@@ -57,8 +72,32 @@ def main():
     report["conservative_bytes"] = report["allocated_bytes"] + report["alignment_allowance"]
     report["within_70_kib"] = report["conservative_bytes"] <= 70 * 1024
     report["svg_source_bytes_separate"] = (machine.root / "panel.svg.fragment").stat().st_size
+    report["installed_svg_bytes"] = len(screen.compose(validate_panel(machine)))
+    report["whole_engine_bytes"] = report["conservative_bytes"] + report["installed_svg_bytes"]
+    report["native_engine_limit_bytes"] = 90 * 1024
+    report["within_native_engine_limit"] = (
+        report["conservative_bytes"] <= report["native_engine_limit_bytes"]
+    )
+    report["whole_engine_scope"] = (
+        "Native code/data/BSS, adapters, all voice slots, alignment allowance and complete installed SVG; excludes shared SDK, caller stack and preset files"
+    )
     (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
-    print(json.dumps({k: report[k] for k in ("allocated_bytes", "conservative_bytes", "within_70_kib")}), flush=True)
+    print(
+        json.dumps(
+            {
+                k: report[k]
+                for k in (
+                    "allocated_bytes",
+                    "conservative_bytes",
+                    "whole_engine_bytes",
+                    "within_native_engine_limit",
+                )
+            }
+        ),
+        flush=True,
+    )
+    if not report["within_native_engine_limit"]:
+        raise RuntimeError("Nightdrive exceeds the 90 KiB native engine budget")
 
 
 if __name__ == "__main__":

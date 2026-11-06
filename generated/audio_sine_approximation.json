@@ -1,15 +1,12 @@
 {
-  "coefficients_q31": [
-    1685724150,
-    -689293677,
-    77049207
-  ],
-  "max_float_error": 5.896438538988136e-05,
   "experimental": true,
-  "kind": "odd degree-five quarter-wave polynomial for output carrier sines only",
+  "kind": "nearest phase, quarter-wave symmetry, output carriers only",
+  "phase_bits": 13,
+  "quarter_nodes": 2049,
+  "table_bytes": 4098,
+  "peak_q15": 32760,
   "feedback_oscillator": "original exact packed lookup",
   "phase_and_control_state": "exact",
   "relative_rms_error_limit_db": -55,
-  "fit_method": "65537 equally spaced quarter-wave points; least squares in x-x^5 and x^3-x^5, with original endpoint amplitude fixed",
-  "target_tables_sha256": "251ce1ccf8aae4cbe8f29112949358184d71b769d5fdf04696ef0866055d8e35"
+  "header_sha256": "9bb20e5761e9e79c849e3ce7ebbc526d13766c457d7fc81a628d97b23debe818"
 }

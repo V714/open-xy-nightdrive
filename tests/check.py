@@ -51,6 +51,7 @@ def main():
     report = {"hardware_tested": False, "device_cycles_measured": False, "checks": {}}
     for name in [
         "range_test",
+        "audio_sine_test",
         "envelope_test",
         "display_test",
         "sound_test",
