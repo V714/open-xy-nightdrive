@@ -40,22 +40,21 @@ static inline bool bandwidth_disabled(u32 increment, i32 speed) {
     const u32 modulator = scaled >= 0x02000000u ? 0x7fffffffu : scaled << 6;
     return increment >= 0x30000000u || modulator >= 0x30000000u;
 }
+struct StableCoefficients {
+    PreparedShaper shaper;
+    PitchFactors pitch;
+    i32 ratio, feedback, modulation, punch;
+};
 template <bool ConstantPitch, bool ModTransient, bool Punch, bool ZeroModulation>
 static inline void render_range(Voice &voice, opxy::Output output, opxy::Pitch pitch,
-                                unsigned begin, unsigned end) {
-    i32 *controls = voice.controls;
-    const i32 punchAmount = Punch ? punch_amount(controls[3]) : 0;
-    i32 driveSquared = multiply(controls[3], controls[3]);
-    i32 driveCompensation = lut(drive_comp_lut, controls[3]);
-    const i32 clippedCompensated = multiply(tanh_clipped, driveCompensation);
-    i32 ratio = operator_ratio(controls[0]);
-    i32 feedbackAmount = feedback_amount(controls[1]),
-        modulationAmount = modulation_amount(controls[2]);
-    PitchFactors factors = pitch_factors(pitch[begin], ratio, feedbackAmount, modulationAmount);
+                                unsigned begin, unsigned end, const StableCoefficients &prepared) {
+    const i32 *controls = voice.controls;
+    PitchFactors factors = prepared.pitch;
     for (unsigned i = begin; i < end; ++i) {
         const u32 increment = pitch[i];
         if (!ConstantPitch)
-            factors = pitch_factors(increment, ratio, feedbackAmount, modulationAmount);
+            factors =
+                pitch_factors(increment, prepared.ratio, prepared.feedback, prepared.modulation);
         // Keep both Q31 rounding stages identical to the original render.
         i32 fboffset = multiply(voice.feedback[0] + voice.feedback[1], factors.feedback);
         i32 modulatorSignal = sine(voice.modulator + u32(fboffset));
@@ -80,10 +79,9 @@ static inline void render_range(Voice &voice, opxy::Output output, opxy::Pitch p
         }
         if (Punch) {
             i32 envelope = i32(1103 - voice.transientAge) * 1946948;
-            signal += multiply(signal, multiply(punchAmount, envelope)) / 2;
+            signal += multiply(signal, multiply(prepared.punch, envelope)) / 2;
         }
-        signal = saturate_approx(signal, controls[3], driveSquared, driveCompensation,
-                                 clippedCompensated);
+        signal = apply_shaper(signal, prepared.shaper);
         if (ModTransient)
             ++voice.transientAge;
         output[i] = clamp(dc_block(signal, voice.prev, voice.dc) / 4, -402653184, 402653184);
@@ -94,21 +92,34 @@ static inline void render_range(Voice &voice, opxy::Output output, opxy::Pitch p
 // Split only at the original sample boundaries; state updates keep their order.
 template <bool ConstantPitch, bool ZeroModulation>
 static inline void render_block(Voice &voice, opxy::Output output, opxy::Pitch pitch) {
+    const i32 ratio = operator_ratio(voice.controls[0]);
+    const i32 feedback = feedback_amount(voice.controls[1]);
+    const i32 modulation = modulation_amount(voice.controls[2]);
+    const StableCoefficients prepared = {prepare_shaper(voice.controls[3]),
+                                         pitch_factors(pitch[0], ratio, feedback, modulation),
+                                         ratio,
+                                         feedback,
+                                         modulation,
+                                         voice.transientAge < 1103 ? punch_amount(voice.controls[3])
+                                                                   : 0};
     unsigned begin = 0;
     if (voice.transientAge < 1103) {
         const unsigned remaining = 1103 - voice.transientAge;
         const unsigned end = remaining < 64 ? remaining : 64;
-        render_range<ConstantPitch, true, true, ZeroModulation>(voice, output, pitch, begin, end);
+        render_range<ConstantPitch, true, true, ZeroModulation>(voice, output, pitch, begin, end,
+                                                                prepared);
         begin = end;
     }
     if (begin < 64 && voice.transientAge < 3528) {
         const unsigned remaining = 3528 - voice.transientAge;
         const unsigned end = remaining < 64 - begin ? begin + remaining : 64;
-        render_range<ConstantPitch, true, false, ZeroModulation>(voice, output, pitch, begin, end);
+        render_range<ConstantPitch, true, false, ZeroModulation>(voice, output, pitch, begin, end,
+                                                                 prepared);
         begin = end;
     }
     if (begin < 64)
-        render_range<ConstantPitch, false, false, ZeroModulation>(voice, output, pitch, begin, 64);
+        render_range<ConstantPitch, false, false, ZeroModulation>(voice, output, pitch, begin, 64,
+                                                                  prepared);
 }
 // After the finite attack, plan independent coefficients in bounded spans before the FM loop.
 template <bool AllChanging>
