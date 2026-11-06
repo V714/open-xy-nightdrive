@@ -23,5 +23,14 @@ int main() {
         require(error >= -450000 && error <= 450000, "phase quantization bound");
         require(dsp::sine_audio(random + 0x80000000u) == -value, "half-cycle symmetry");
     }
-    std::puts("PASS audio sine: nodes, wrap, symmetry and 2 million phase-error bounds");
+    for (unsigned i = 0; i < 100000; ++i) {
+        random = random * 1664525u + 1013904223u;
+        const auto a = dsp::sine(random);
+        random = random * 1664525u + 1013904223u;
+        const auto b = dsp::sine_audio(random);
+        const auto previous = a - dsp::multiply(a, 429496729) + dsp::multiply(b, 429496729);
+        const auto candidate = dsp::mix(a, b, 429496729);
+        require(candidate == previous || candidate == previous - 1, "one-LSB blend rounding bound");
+    }
+    std::puts("PASS audio sine: nodes, wrap, symmetry, 2 million phases and blend rounding");
 }

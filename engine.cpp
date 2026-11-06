@@ -77,8 +77,7 @@ static inline void render_range(Voice &voice, opxy::Output output, opxy::Pitch p
         i32 signal = fundamental;
         if (!ZeroModulation) {
             const i32 modulatedSignal = sine_audio(carrier + phaseOffset);
-            signal = modulatedSignal - multiply(modulatedSignal, 429496729) +
-                     multiply(fundamental, 429496729);
+            signal = mix(modulatedSignal, fundamental, 429496729);
         }
         if (Punch) {
             i32 envelope = i32(1103 - age) * 1946948;
@@ -211,8 +210,7 @@ render_planned_sustain(Voice &voice, Shared &, u32, opxy::Output output,
             const i32 phaseModulation = multiply(modulatorSignal * 2, frame.modulation);
             const i32 fundamental = sine_audio(carrier);
             const i32 modulatedSignal = sine_audio(carrier + u32(phaseModulation) * 2u);
-            i32 signal = modulatedSignal - multiply(modulatedSignal, 429496729) +
-                         multiply(fundamental, 429496729);
+            i32 signal = mix(modulatedSignal, fundamental, 429496729);
             signal = glareChanging ? saturate_approx(signal, frame.glare)
                                    : apply_shaper(signal, heldShaper);
             output[i] = clamp(dc_block(signal, previous, dc) / 4, -402653184, 402653184);
@@ -311,8 +309,7 @@ template <bool AllChanging>
         }
         i32 fundamental = sine_audio(carrier),
             modulatedSignal = sine_audio(carrier + u32(phaseModulation) * 2u + transientPhase);
-        i32 signal = modulatedSignal - multiply(modulatedSignal, 429496729) +
-                     multiply(fundamental, 429496729);
+        i32 signal = mix(modulatedSignal, fundamental, 429496729);
         if (age < 1103) {
             i32 envelope = i32(1103 - age) * 1946948;
             signal += multiply(signal, multiply(punchAmount, envelope)) / 2;
