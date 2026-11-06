@@ -72,11 +72,11 @@ static inline void render_range(Voice &voice, opxy::Output output, opxy::Pitch p
             i32 envelope = i32(3528 - age) * 608697;
             transientPhase = u32(multiply(phaseModulation, multiply(drift, envelope)));
         }
-        const i32 fundamental = sine(carrier);
+        const i32 fundamental = sine_audio(carrier);
         const u32 phaseOffset = u32(phaseModulation) * 2u + transientPhase;
         i32 signal = fundamental;
         if (!ZeroModulation) {
-            const i32 modulatedSignal = sine(carrier + phaseOffset);
+            const i32 modulatedSignal = sine_audio(carrier + phaseOffset);
             signal = modulatedSignal - multiply(modulatedSignal, 429496729) +
                      multiply(fundamental, 429496729);
         }
@@ -209,8 +209,8 @@ render_planned_sustain(Voice &voice, Shared &, u32, opxy::Output output,
             feedback1 = feedback0;
             feedback0 = modulatorSignal;
             const i32 phaseModulation = multiply(modulatorSignal * 2, frame.modulation);
-            const i32 fundamental = sine(carrier);
-            const i32 modulatedSignal = sine(carrier + u32(phaseModulation) * 2u);
+            const i32 fundamental = sine_audio(carrier);
+            const i32 modulatedSignal = sine_audio(carrier + u32(phaseModulation) * 2u);
             i32 signal = modulatedSignal - multiply(modulatedSignal, 429496729) +
                          multiply(fundamental, 429496729);
             signal = glareChanging ? saturate_approx(signal, frame.glare)
@@ -309,8 +309,8 @@ template <bool AllChanging>
             i32 envelope = i32(3528 - age) * 608697;
             transientPhase = u32(multiply(phaseModulation, multiply(drift, envelope)));
         }
-        i32 fundamental = sine(carrier),
-            modulatedSignal = sine(carrier + u32(phaseModulation) * 2u + transientPhase);
+        i32 fundamental = sine_audio(carrier),
+            modulatedSignal = sine_audio(carrier + u32(phaseModulation) * 2u + transientPhase);
         i32 signal = modulatedSignal - multiply(modulatedSignal, 429496729) +
                      multiply(fundamental, 429496729);
         if (age < 1103) {

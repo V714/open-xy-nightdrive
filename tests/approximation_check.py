@@ -1,4 +1,4 @@
-"""Gate experimental post-oscillator approximations and export approved A/B audio."""
+"""Gate bounded audio approximations and export approved A/B audio."""
 
 from pathlib import Path
 import argparse
@@ -19,6 +19,8 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--error-limit-db", type=float, default=-55)
     parser.add_argument("--cxx", default="/usr/bin/c++")
+    parser.add_argument("--audio-oscillator", action="store_true",
+                        help="Allow bounded changes to the audio oscillator, including Glare zero; feedback and phase state still must match")
     args = parser.parse_args()
     sdk, baseline, out = args.sdk_root.resolve(), args.baseline.resolve(), args.out.resolve()
     if out.is_relative_to(MACHINE) or out.is_relative_to(baseline):
@@ -51,6 +53,7 @@ def main():
     report = {"sources": {tag: {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                                 for p in sorted(root.iterdir()) if p.suffix in (".h", ".cpp", ".json")}
                            for tag, root in (("before", baseline), ("after", MACHINE))},
+              "audio_oscillator_approximation": args.audio_oscillator,
               "relative_error_limit_db": args.error_limit_db, "cases": [], "failures": [],
               "device_cycles_measured": False, "hardware_tested": False}
     glare_values = (0, .01, .05, .1, .25, .5, .75, .9, 1, .031, .123, .401, .613, .913)
@@ -82,7 +85,7 @@ def main():
                     report["failures"].append({"case": name, "reason": "relative error above gate"})
                 if entry["peak_after"] > peak + 1e-9:
                     report["failures"].append({"case": name, "reason": "declared output peak exceeded"})
-                if glare == 0 and not np.array_equal(before, after):
+                if glare == 0 and not args.audio_oscillator and not np.array_equal(before, after):
                     report["failures"].append({"case": name, "reason": "Glare zero changed"})
                 report["cases"].append(entry)
 

@@ -21,6 +21,16 @@ static inline i32 sine(u32 p) {
     const i32 delta = i32(opxy::i16(packed >> 16)) * 32768;
     return a + multiply(delta, i32((p & 0x1fffffu) << 10));
 }
+// Degree-five audio-only sine approximation. Feedback keeps the exact lookup.
+static inline i32 sine_audio(u32 phase) {
+    const u32 half = phase & 0x7fffffffu;
+    const u32 folded = half <= 0x40000000u ? half : 0x80000000u - half;
+    const i32 x = folded == 0x40000000u ? 2147483647 : i32(folded << 1);
+    const i32 squared = multiply(x, x);
+    const i32 polynomial = 1685724150 + multiply(squared, -689293677 + multiply(squared, 77049207));
+    const i32 signal = multiply(x, polynomial);
+    return phase & 0x80000000u ? -signal : signal;
+}
 static inline i32 lut(const i32 *table, i32 control) {
     unsigned j = u32(control) >> 23;
     return mix(table[j], table[j + 1], i32((u32(control) & 0x7fffffu) << 8));
