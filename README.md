@@ -1,10 +1,12 @@
 # Nightdrive
 
-Version **1.0.1** · Author and maintainer: **Tomasz Lipczyński (V7)** · GitHub: [**V714**](https://github.com/V714) · MIT licensed.
+Version **1.0.2** · Author and maintainer: **Tomasz Lipczyński (V7)** · GitHub: [**V714**](https://github.com/V714) · MIT licensed.
 
 A four-control feedback FM bass synthesizer for OP-XY, with an animated isometric night-drive scene.
-The source targets Open-XY SDK 1.1 and later compatible 1.x releases, for stock OS 1.2.0. Audio is mono Q31 at 44.1 kHz, in 64-sample
+The source targets Open-XY SDK 1.3 and later compatible 1.x releases, for stock OS 1.2.1. Audio is mono Q31 at 44.1 kHz, in 64-sample
 blocks, without oversampling. This folder is the canonical source for further Nightdrive development.
+
+See [CHANGELOG.md](CHANGELOG.md) for release changes and validation status.
 
 ## Controls
 
@@ -27,8 +29,8 @@ former full-scale amount. Glare's saturation mapping is unchanged. Both
 transients are bypassed at zero. These are changes to the existing feedback
 and Punch; there is no separate noise generator.
 There is no internal amplitude decay: note length and sustain follow the device's stock ADSR. There are no alternate controls.
-No named presets are distributed. The four control defaults provide the initial sound.
-The SDK builder may generate its standard init preset from these defaults.
+Four named presets are bundled in `presets/`. The SDK builder also generates an init preset
+from the four control defaults.
 
 Speed follows exponential interpolation through 0: 0.25×, 5: 0.5×, 10: 1×, 25: 2×,
 50: 4×, 75: 8× and 100: 16×. Existing project values use this mapping. Visual speed remains 0.25–2×.
@@ -46,9 +48,9 @@ SDK-owned 20-pixel header. The reference artwork lives in `assets/`.
 ## Use with Open-XY
 
 This is a standalone machine repository. It contains no SDK, stock firmware or stock content.
-The machine is at the repository root; its catalog path is `.`. Minimum supported SDK: **1.1**.
-CI checks against Open-XY staging commit `1340b45838c8dc56abadf362faf7ce9966e6514a`
-(SDK 1.2, compatible with this machine's SDK 1.1 contract).
+The machine is at the repository root; its catalog path is `.`. Minimum supported SDK: **1.3**.
+CI checks against Open-XY staging commit `6b2e4d10093584854adb86edce42c931b3bc0a7e`
+(compatible with this machine's SDK 1.3 contract).
 
 ### Quick installation
 
@@ -81,7 +83,7 @@ Run the following commands from the SDK directory:
    Nightdrive, and follow the installation guide.
 
 Replace the example paths with your own. The OS input must be the original stock
-OP-XY 1.2.0 `os.ldr`. Keep the output directory outside every Git checkout.
+OP-XY 1.2.1 `os.ldr`. Keep the output directory outside every Git checkout.
 No SDK modifications are required. See the SDK's
 [build guide](https://github.com/etcetc000/open-xy/blob/staging/docs/build.md)
 for toolchain setup and supported build hosts.
@@ -94,7 +96,7 @@ Keep the SDK in a separate sibling folder. From this repository root:
 
 ```sh
 git clone https://github.com/etcetc000/open-xy.git ../open-xy-sdk
-git -C ../open-xy-sdk checkout 1340b45838c8dc56abadf362faf7ce9966e6514a
+git -C ../open-xy-sdk checkout 6b2e4d10093584854adb86edce42c931b3bc0a7e
 python -m pip install -r requirements-dev.txt
 python ../open-xy-sdk/sdk.py test --machine . --cxx clang++ --host-cxx g++
 python ../open-xy-sdk/sdk.py preview --machine . --out ../nightdrive-preview-001

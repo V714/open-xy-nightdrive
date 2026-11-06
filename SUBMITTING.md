@@ -1,42 +1,36 @@
-# Publishing Nightdrive 1.0.1
+# Publishing Nightdrive 1.0.2
 
-Nightdrive stays in this repository. The Open-XY contribution changes only
-`catalog/machines.json` in a pull request targeting `etcetc000/open-xy:staging`.
-The official [catalog guide](https://github.com/etcetc000/open-xy/blob/staging/docs/catalog.md)
-is the authority for submission and hardware profiling requirements.
+Nightdrive source, tests, artwork and presets stay in this repository. Never move
+an existing public tag. See [CHANGELOG.md](CHANGELOG.md) for release changes and
+validation status.
 
 ## Publish the source
 
-This update adds device-saved presets and requires SDK 1.3. Push the source:
+The local `main` branch and annotated `v1.0.2` tag identify the release. Push:
 
 ```sh
 git push origin main
+git push origin v1.0.2
 ```
 
-Wait for **Machine checks** to pass, including the Windows native compile.
-Then tag that exact tested commit:
+Wait for **Machine checks**, including the Windows native compile. Publish a
+GitHub release from `v1.0.2` using its changelog entry. Do not attach stock firmware,
+stock artwork, firmware-containing packages or the private personal builder.
 
-```sh
-git fetch origin --tags
-git tag -a v1.0.1 -m "Nightdrive 1.0.1: bundled presets"
-git push origin v1.0.1
-git rev-parse 'v1.0.1^{commit}'
-```
+## Update the Open-XY catalog
 
-Use a new version if a tag already exists; never move a public tag. Keep the
-full commit SHA from the last command.
+Follow the current SDK [catalog guide](https://github.com/etcetc000/open-xy/blob/main/docs/catalog.md).
+The source release and catalog acceptance are separate. Listening and automation
+have been confirmed on OP-XY; a revision-bound hardware CPU report is still needed
+before this CPU-affecting update can be submitted to the catalog.
 
-## Update the catalog submission
+Profile the tagged revision following the SDK's hardware profiling guide. Generate
+`catalog-cpu.json` with `sdk.py profile report`; both average `block_percent` and
+worst-block `peak_percent` must be present. Host estimates cannot replace them.
 
-Update the existing [Nightdrive PR #112](https://github.com/etcetc000/open-xy/pull/112)
-on its source branch `V714:patch-1`. In the `nightdrive` entry of
-`catalog/machines.json`, set `tag` to `v1.0.1` and `commit` to the full tested
-commit SHA. Preserve its ID, repository, root path `.` and review status.
-Commit that manifest edit on the same branch to update the existing PR.
-Only the catalog entry belongs in Open-XY; the presets remain in this repository.
-
-Mention that this update adds four presets using the SDK 1.3 `presets` field
-without changing DSP code. Follow the catalog's current requirements for any
-revision-bound hardware CPU readout; host estimates do not replace it.
-The public builder picks up the new files after catalog acceptance and deployment.
-For local testing, export a fresh personal kit with SDK 1.3 and this machine.
+Once available, update only Nightdrive's entry in `catalog/machines.json`: set
+`tag` to `v1.0.2`, `commit` to `git rev-parse 'v1.0.2^{commit}'`, and `cpu` to the
+complete generated record. Preserve identity, repository, path and review status.
+Use the target branch required by the current catalog guide; an SDK requirement
+available only on staging targets staging. Review the full hardware checklist
+for the exact tagged revision before submission.
