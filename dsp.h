@@ -41,8 +41,10 @@ static inline i32 operator_ratio(i32 control) {
         return feedback_maximum;
     return multiply(control, 581030184) + lut(feedback_boost_lut, control);
 }
-static inline i32 modulation_amount(i32 control) {
-    return multiply(control, 1367130551) + lut(modulation_boost_lut, control);
+[[gnu::always_inline]] static inline i32 modulation_amount(i32 control) {
+    const i32 linear = multiply(control, 1367130551);
+    // Both neighboring table entries are exactly zero through this boundary.
+    return control <= 1501560832 ? linear : linear + lut(modulation_boost_lut, control);
 }
 static inline i32 punch_amount(i32 control) {
     if (control == 2147483647)
@@ -55,11 +57,14 @@ static inline bool settled(const i32 *c, const i32 *p) {
             return false;
     return true;
 }
+static inline i32 smooth_control(i32 current, i32 target) {
+    const i32 distance = target - current;
+    const i32 step = distance / 512;
+    return current + (step ? step : distance);
+}
 static inline void tick_controls(i32 *c, const i32 *p) {
-    for (unsigned k = 0; k < 4; ++k) {
-        i32 target = p[k] < 0 ? 0 : p[k], d = target - c[k];
-        c[k] += (d < 512 && d > -512) ? d : d / 512;
-    }
+    for (unsigned k = 0; k < 4; ++k)
+        c[k] = smooth_control(c[k], p[k] < 0 ? 0 : p[k]);
 }
 static inline i32 saturate(i32 x, i32 drive, i32 squared, i32 compensation) {
     if (!drive)
@@ -92,19 +97,52 @@ static inline i32 saturate(i32 x, i32 drive) {
     return saturate(x, drive, multiply(drive, drive), lut(drive_comp_lut, drive));
 }
 // Experimental bilinear output-shaper LUT: no change to oscillator or feedback state.
+[[gnu::always_inline]] static inline i32 interpolate_segment(u32 segment, u32 amplitude) {
+    const unsigned shift = 31 - shaper_amplitude_bits;
+    const opxy::u16 fraction = opxy::u16(amplitude >> (shift - 16));
+    return i32(segment << 16) + i32(segment >> 16) * i32(fraction);
+}
 [[gnu::always_inline]] static inline i32 shaper_row(unsigned row, u32 amplitude) {
     const unsigned shift = 31 - shaper_amplitude_bits;
     const unsigned column = amplitude >> shift;
     if (shaper_scale == 65536) {
-        const i32 a = shaper_lut[row][column];
-        const opxy::i16 delta = opxy::i16(i32(shaper_lut[row][column + 1]) - a);
-        const opxy::u16 fraction = opxy::u16(amplitude >> (shift - 16));
-        // Integer Q15 interpolation: one 16x16 multiply instead of a Q31 multiply.
-        // Truncating the fraction adds at most |delta| Q31 words of error.
-        return a * 65536 + i32(delta) * i32(fraction);
+        return interpolate_segment(shaper_segments[row][column], amplitude);
     }
     const i32 fraction = i32((amplitude & ((1u << shift) - 1)) << shaper_amplitude_bits);
     return mix(shaper_lut[row][column], shaper_lut[row][column + 1], fraction);
+}
+struct PreparedShaper {
+    const u32 *segments, *next;
+    unsigned row;
+    i32 fraction;
+};
+[[gnu::always_inline]] static inline PreparedShaper prepare_shaper(i32 drive) {
+    if (!drive)
+        return {nullptr, nullptr, ~0u, 0};
+    const unsigned shift = 31 - shaper_drive_bits;
+    unsigned row = u32(drive) >> shift;
+    u32 fraction = (u32(drive) & ((1u << shift) - 1)) << shaper_drive_bits;
+    if (fraction >= 0x80000000u - (2u << shaper_drive_bits)) {
+        ++row;
+        fraction = 0;
+    }
+    return {shaper_scale == 65536 ? shaper_segments[row] : nullptr,
+            shaper_scale == 65536 && fraction ? shaper_segments[row + 1] : nullptr, row,
+            i32(fraction)};
+}
+[[gnu::always_inline]] static inline i32 apply_shaper(i32 x, const PreparedShaper &shaper) {
+    if (shaper.row == ~0u)
+        return x;
+    const u32 amplitude = u32(x < 0 ? -x : x);
+    const unsigned column = amplitude >> (31 - shaper_amplitude_bits);
+    i32 value = shaper_scale == 65536 ? interpolate_segment(shaper.segments[column], amplitude)
+                                      : shaper_row(shaper.row, amplitude);
+    if (shaper.fraction) {
+        const i32 next = shaper_scale == 65536 ? interpolate_segment(shaper.next[column], amplitude)
+                                               : shaper_row(shaper.row + 1, amplitude);
+        value = mix(value, next, shaper.fraction);
+    }
+    return x < 0 ? -value : value;
 }
 [[gnu::always_inline]] static inline i32 saturate_approx(i32 x, i32 drive, i32, i32, i32) {
     if (!drive)

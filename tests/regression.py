@@ -15,15 +15,34 @@ def compare(baseline, sdk, out, compiler, baseline_sdk=None):
     exact = {}
     for tag, source in [("before", baseline), ("after", MACHINE)]:
         binary = out / (tag + "-exact")
-        compile_test(MACHINE / "tests/helpers/exact_render.cpp", binary,
-                     baseline_sdk if tag == "before" and baseline_sdk else sdk,
-                     compiler, source)
+        compile_test(
+            MACHINE / "tests/helpers/exact_render.cpp",
+            binary,
+            baseline_sdk if tag == "before" and baseline_sdk else sdk,
+            compiler,
+            source,
+        )
         raw = out / (tag + "-exact.q31")
         result = subprocess.run([str(binary), str(raw)], check=True, text=True, capture_output=True)
         exact[tag] = hashlib.sha256(raw.read_bytes()).hexdigest()
         print(tag + ": " + result.stdout.strip())
     if exact["before"] != exact["after"]:
         raise RuntimeError("Exact corpus changed: audio or persistent voice state")
+    automation = {}
+    for tag, source in [("before", baseline), ("after", MACHINE)]:
+        binary = out / (tag + "-automation")
+        compile_test(
+            MACHINE / "tests/automation_test.cpp",
+            binary,
+            baseline_sdk if tag == "before" and baseline_sdk else sdk,
+            compiler,
+            source,
+        )
+        raw = out / (tag + "-automation.q31")
+        subprocess.run([str(binary), str(raw)], check=True)
+        automation[tag] = hashlib.sha256(raw.read_bytes()).hexdigest()
+    if automation["before"] != automation["after"]:
+        raise RuntimeError("Automation changed: exact audio or persistent voice state")
     binaries = {}
     for tag, source in [("before", baseline), ("after", MACHINE)]:
         binaries[tag] = {}
@@ -98,6 +117,7 @@ def compare(baseline, sdk, out, compiler, baseline_sdk=None):
         raise RuntimeError("Static artwork changed")
     result = {
         "exact_corpus_sha256": exact["after"],
+        "automation_corpus_sha256": automation["after"],
         "exact_audio_cases": count,
         "visible_frame_cases": 5,
         "offscreen_parking_normalized": True,

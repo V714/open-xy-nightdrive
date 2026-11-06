@@ -145,7 +145,8 @@ python ../open-xy-sdk/sdk.py test --machine .
 ```
 
 The host checks cover initial and extreme sound settings, all four controls, ten-second sustain, reference output level,
-256 voice indices, extreme controls and pitches, and 24,000 drawing frames. They do not measure OP-XY
+256 voice indices, extreme controls and pitches, rapid individual/joint automation,
+and 24,000 drawing frames. They do not measure OP-XY
 CPU load or establish hardware behavior. For exact before/after audio and frame comparisons, add
 `--baseline /path/to/previous/nightdrive` to `tests/check.py`. Use `--baseline-sdk-root /path/to/previous/sdk` when comparing across SDK versions.
 Checks remain active with Python `-O`.
@@ -188,11 +189,29 @@ firmware, stock artwork or third-party audio samples are included.
 
 The packed sine lookup and existing FM fast paths retain their Q31 rounding.
 The output shaper samples the exact compensated Glare transfer function on a
-33 × 129 grid. Amplitude interpolation uses a 16-bit fraction and an integer
-product; interpolation between Glare rows retains Q31 precision. At zero Glare
+33 × 129 grid. Each of its 33 × 128 segments stores the original Q15 base and
+its exact slope in one 32-bit word, reducing interpolation to one table load.
+Amplitude interpolation uses a 16-bit fraction and an integer
+product; interpolation between Glare rows retains Q31 precision. The reference
+grid remains available to tests and is discarded from production objects. At zero Glare
 it returns the input exactly. Oscillator and feedback updates are unchanged,
 including when modulation bandwidth reaches zero. Smoothing still runs at the
-original sample rate. No per-voice cache or additional state is required.
+original sample rate. Automation snapshots its targets once per block and updates
+only the coefficients whose controls move. Fixed pitch factors are reused when
+Speed and pitch stay fixed, and a separate full-automation loop avoids partial-update
+checks when all four controls move. Audio and persistent state are checked bit for
+bit against an explicit baseline, including block-rate automation and settling.
+No per-voice cache or additional state is required.
+
+After the finite timbre transient finishes, Speed automation and automation of
+three or four controls plan coefficients in two 32-sample spans before running
+the feedback-dependent audio loop. Controls and coefficients still update for
+every sample with the original rounding; this does not lower the control rate.
+Each span uses 512 bytes of temporary coefficient storage on the stack. When
+Glare stays fixed, its table rows and interpolation fraction are prepared once
+per block. Sparse automation and the initial transient retain the compact loop.
+Regression checks cover all 15 nonempty control subsets, including changes of
+the active subset while a note is held.
 
 `tests/analyze_blackfin.py --sdk-root <sdk> --out <fresh-dir>
 --approximate-saturation` checks the Linux tool hashes and emits assembly and stack
