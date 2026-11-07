@@ -1,4 +1,4 @@
-"""Fit a bounded audio-only sine polynomial; feedback stays on the exact lookup."""
+"""Fit small audio-only quadratic segments; feedback stays on the exact lookup."""
 
 from pathlib import Path
 import hashlib
@@ -8,6 +8,7 @@ import numpy as np
 from cpp_format import write_header
 
 ROOT = Path(__file__).resolve().parent.parent
+SEGMENT_BITS = 4
 
 
 def main():
@@ -15,27 +16,33 @@ def main():
     values = np.array(
         [int(v) for v in re.findall(r"-?\d+", text.split("{", 1)[1].split("};", 1)[0])]
     )
-    x = np.linspace(0, 1, 65537)
-    target = np.interp(x * 512, np.arange(513), values[:513]) / 65536
-    amplitude = float(values[512] / 65536)
-    fit = np.linalg.lstsq(
-        np.stack([x - x**5, x**3 - x**5], axis=1), target - amplitude * x**5, rcond=None
-    )[0]
-    coefficients = [float(fit[0]), float(fit[1]), amplitude - float(fit.sum())]
-    fixed = [int(round(v * 2147483648)) for v in coefficients]
+    count, segments = 1 << SEGMENT_BITS, []
+    u = np.linspace(0, 1, 4097)
+    basis = u * (u - 1)
+    for i in range(count):
+        target = np.interp((i + u) * 512 / count, np.arange(513), values[:513]) / 65536
+        start, end = float(values[i * 512 // count] / 65536), float(
+            values[(i + 1) * 512 // count] / 65536
+        )
+        curve = float(np.dot(basis, target - (start + (end - start) * u)) / np.dot(basis, basis))
+        base, quadratic = int(round(start * 2147483648)), int(round(curve * 2147483648))
+        linear = int(round(end * 2147483648)) - base - quadratic
+        segments.append([base, linear, quadratic])
     header = ROOT / "audio_sine_coefficients.h"
     source = "#pragma once\n#include <opxy/types.hpp>\nnamespace nightdrive {\n"
-    source += "".join(
-        "static const opxy::i32 audio_sine_" + name + " = " + str(value) + ";\n"
-        for name, value in zip("abc", fixed)
-    )
-    write_header(header, source + "}\n")
+    source += "static const unsigned audio_sine_segment_bits = " + str(SEGMENT_BITS) + ";\n"
+    source += "struct AudioSineSegment { opxy::i32 base, linear, quadratic; };\n"
+    source += "static const AudioSineSegment audio_sine_segments[" + str(count) + "] = {"
+    source += ",".join("{" + ",".join(map(str, row)) + "}" for row in segments) + "};\n}\n"
+    write_header(header, source)
     manifest = {
         "experimental": True,
-        "kind": "branch-free odd degree-five quarter-wave polynomial, output carriers only",
-        "coefficients_q31": fixed,
-        "fit_points": 65537,
-        "fit_constraint": "original quarter-wave endpoint amplitude",
+        "kind": "branch-free quadratic quarter-wave segments, output carriers only",
+        "segment_bits": SEGMENT_BITS,
+        "segments_q31": segments,
+        "runtime_table_bytes": count * 12,
+        "fit_points_per_segment": 4097,
+        "fit_constraint": "original endpoints of each segment",
         "target_tables_sha256": hashlib.sha256((ROOT / "tables.h").read_bytes()).hexdigest(),
         "feedback_oscillator": "original exact packed lookup",
         "phase_and_control_state": "exact",

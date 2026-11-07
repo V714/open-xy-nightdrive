@@ -193,9 +193,10 @@ firmware, stock artwork or third-party audio samples are included.
 ## CPU analysis without firmware
 
 The feedback oscillator retains its original packed sine lookup and Q31 rounding.
-Output carrier sines use a degree-five quarter-wave polynomial with arithmetic
-phase folding and sign restoration. It uses no phase-dependent branches or
-additional waveform tables. Feedback retains its original exact sine lookup.
+Output carrier sines use 16 quadratic quarter-wave segments with arithmetic
+phase folding and sign restoration. The coefficients occupy 192 bytes; each
+sine needs two fixed-point multiplies. Independent output polynomials are
+interleaved to expose instruction-level parallelism without changing rounding. Feedback retains its original exact sine lookup.
 Regenerate coefficients with `python generators/generate_audio_sine.py`.
 The 80/20 output blend uses one multiply; its rounding differs by at most one
 Q31 unit from the previous two-multiply expression, before downstream processing.

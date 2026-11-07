@@ -1,7 +1,17 @@
 #pragma once
 #include <opxy/types.hpp>
 namespace nightdrive {
-static const opxy::i32 audio_sine_a = 1685724150;
-static const opxy::i32 audio_sine_b = -689293677;
-static const opxy::i32 audio_sine_c = 77049207;
+static const unsigned audio_sine_segment_bits = 4;
+struct AudioSineSegment {
+    opxy::i32 base, linear, quadratic;
+};
+static const AudioSineSegment audio_sine_segments[16] = {
+    {0, 105471816, -253768},          {105218048, 104981390, -779150},
+    {209420288, 103450525, -1247133}, {311623680, 100880384, -1691648},
+    {410812416, 97406578, -2182770},  {506036224, 93040674, -2699298},
+    {596377600, 87720637, -3080893},  {681017344, 81491311, -3437935},
+    {759070720, 74539080, -3792968},  {829816832, 66886488, -4135768},
+    {892567552, 58552682, -4387178},  {946733056, 49703652, -4680420},
+    {991756288, 40420522, -4932778},  {1027244032, 30625196, -5000620},
+    {1052868608, 20521461, -5087733}, {1068302336, 10348794, -5171450}};
 } // namespace nightdrive

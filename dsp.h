@@ -22,34 +22,34 @@ static inline i32 sine(u32 p) {
     const i32 delta = i32(opxy::i16(packed >> 16)) * 32768;
     return a + multiply(delta, i32((p & 0x1fffffu) << 10));
 }
-// Branch-free quarter-wave polynomial for audio only; feedback keeps exact lookup.
-static inline i32 sine_audio(u32 phase) {
-    const i32 centered = i32(phase & 0x7fffffffu) - 1073741824;
-    const i32 magnitude = centered < 0 ? -centered : centered;
-    const u32 doubled = (1073741824u - u32(magnitude)) << 1;
-    const i32 x = i32(doubled - (doubled >> 31));
-    const i32 squared = multiply(x, x);
-    const i32 polynomial =
-        audio_sine_a + multiply(squared, audio_sine_b + multiply(squared, audio_sine_c));
-    const i32 signal = multiply(x, polynomial);
-    const i32 sign = -i32(phase >> 31);
-    return (signal ^ sign) - sign;
-}
 [[gnu::always_inline]] static inline i32 audio_fold(u32 phase) {
     const i32 centered = i32(phase & 0x7fffffffu) - 1073741824;
     const i32 magnitude = centered < 0 ? -centered : centered;
     const u32 doubled = (1073741824u - u32(magnitude)) << 1;
     return i32(doubled - (doubled >> 31));
 }
-// Interleave independent polynomial chains to expose instruction-level parallelism.
+static inline i32 sine_audio(u32 phase) {
+    const u32 x = u32(audio_fold(phase));
+    const auto &segment = audio_sine_segments[x >> (31 - audio_sine_segment_bits)];
+    const i32 fraction =
+        i32((x & ((1u << (31 - audio_sine_segment_bits)) - 1u)) << audio_sine_segment_bits);
+    const i32 value =
+        segment.base + multiply(fraction, segment.linear + multiply(fraction, segment.quadratic));
+    const i32 sign = -i32(phase >> 31);
+    return (value ^ sign) - sign;
+}
 [[gnu::always_inline]] static inline void sine_audio_pair(u32 a, u32 b, i32 &outA, i32 &outB) {
-    const i32 xA = audio_fold(a), xB = audio_fold(b);
-    const i32 squareA = multiply(xA, xA), squareB = multiply(xB, xB);
-    const i32 firstA = multiply(squareA, audio_sine_c), firstB = multiply(squareB, audio_sine_c);
-    const i32 secondA = multiply(squareA, audio_sine_b + firstA);
-    const i32 secondB = multiply(squareB, audio_sine_b + firstB);
-    const i32 valueA = multiply(xA, audio_sine_a + secondA);
-    const i32 valueB = multiply(xB, audio_sine_a + secondB);
+    const u32 xA = u32(audio_fold(a)), xB = u32(audio_fold(b));
+    const auto &coefA = audio_sine_segments[xA >> (31 - audio_sine_segment_bits)],
+               &coefB = audio_sine_segments[xB >> (31 - audio_sine_segment_bits)];
+    const i32 fractionA = i32((xA & ((1u << (31 - audio_sine_segment_bits)) - 1u))
+                              << audio_sine_segment_bits),
+              fractionB = i32((xB & ((1u << (31 - audio_sine_segment_bits)) - 1u))
+                              << audio_sine_segment_bits);
+    const i32 firstA = multiply(fractionA, coefA.quadratic),
+              firstB = multiply(fractionB, coefB.quadratic);
+    const i32 valueA = coefA.base + multiply(fractionA, coefA.linear + firstA);
+    const i32 valueB = coefB.base + multiply(fractionB, coefB.linear + firstB);
     const i32 signA = -i32(a >> 31), signB = -i32(b >> 31);
     outA = (valueA ^ signA) - signA;
     outB = (valueB ^ signB) - signB;
