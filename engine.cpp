@@ -53,8 +53,9 @@ static inline void render_range(Voice &voice, opxy::Output output, opxy::Pitch p
     i32 feedback0 = voice.feedback[0], feedback1 = voice.feedback[1];
     i32 previous = voice.prev, dc = voice.dc;
     PitchFactors factors = prepared.pitch;
+    const u32 heldIncrement = ConstantPitch ? pitch[0] : 0;
     for (unsigned i = begin; i < end; ++i) {
-        const u32 increment = pitch[i];
+        const u32 increment = ConstantPitch ? heldIncrement : pitch[i];
         if (!ConstantPitch)
             factors =
                 pitch_factors(increment, prepared.ratio, prepared.feedback, prepared.modulation);
@@ -267,6 +268,7 @@ template <bool AllChanging>
     i32 punchAmount = age < 1103 ? punch_amount(previousGlare) : 0;
     i32 ratio = operator_ratio(speed);
     i32 feedbackAmount = feedback_amount(tension), modulationAmount = modulation_amount(drift);
+    u32 increment = 0;
     for (unsigned i = 0; i < 64; ++i) {
         if (speedChanging)
             speed = smooth_control(speed, speedTarget);
@@ -286,8 +288,8 @@ template <bool AllChanging>
             previousGlare = glare;
             punchAmount = punch_amount(glare);
         }
-        const u32 increment = pitch[i];
         if (!fixedPitch || i == 0) {
+            increment = pitch[i];
             const u32 scaledIncrement = u32(multiply(i32(increment >> 1), ratio));
             modInc = scaledIncrement >= 0x02000000u ? 0x7fffffffu : scaledIncrement << 6;
             const u32 highest = increment > modInc ? increment : modInc;
