@@ -1,9 +1,11 @@
 # Nightdrive
 
-Version **1.0.2** · Author and maintainer: **Tomasz Lipczyński (V7)** · GitHub: [**V714**](https://github.com/V714) · MIT licensed.
+Version **1.0.3** · Author and maintainer: **Tomasz Lipczyński (V7)** · GitHub: [**V714**](https://github.com/V714) · MIT licensed.
 
-**Experimental performance branch after v1.0.2:** output carrier sines may differ within
-a tested relative RMS error limit of -55 dB. The feedback oscillator remains exact.
+Output carrier sines use a bounded polynomial approximation. Sound regression
+tests enforce a relative RMS error limit of -55 dB separately for each case and
+region; the measured worst automation error is -71.77 dB. The feedback oscillator
+remains exact. See [PERFORMANCE.md](PERFORMANCE.md) for hardware results and limits.
 
 A four-control feedback FM bass synthesizer for OP-XY, with an animated isometric night-drive scene.
 The source targets Open-XY SDK 1.3 and later compatible 1.x releases, for stock OS 1.2.1. Audio is mono Q31 at 44.1 kHz, in 64-sample
@@ -192,10 +194,10 @@ firmware, stock artwork or third-party audio samples are included.
 
 ## CPU analysis without firmware
 
-The feedback oscillator uses an exact quarter-wave representation of its original
-2048-node sine lookup: 2052 bytes instead of 8192. Negative interpolation retains
-the original truncation by applying polarity before the multiply. Regenerate it
-with `python generators/generate_feedback_sine.py`.
+The feedback oscillator uses the original exact 2048-segment full-cycle lookup,
+packing each base and slope into one word. A smaller exact quarter-wave helper
+remains in the regression tests, but hardware measurements selected the full
+table. Its generator is `generators/generate_feedback_sine.py`.
 Output carrier sines use a degree-five quarter-wave polynomial with arithmetic
 phase folding and sign restoration. It uses no phase-dependent branches or
 additional waveform tables. Feedback retains its original exact sine lookup.
@@ -208,7 +210,9 @@ retaining the original 16-bit amplitude interpolation fraction. The original
 33 × 129 grid remains available to reference checks and is discarded from production. Stable controls
 prepare pitch coefficients and Glare rows once per block, reusing them across
 transient boundaries. Audio state is held locally inside each sample range.
-Voice remains 64 bytes; there is no derived per-voice coefficient cache.
+Voice remains 64 bytes; there is no derived per-voice coefficient cache. The DC
+filter stores half-scale history and returns the final output scale directly,
+removing repeated divisions with a small, tested rounding difference.
 
 Smoothing runs at the original sample rate. Automation snapshots targets once per
 block and updates only coefficients whose controls move. A full-automation loop
@@ -224,6 +228,9 @@ Glare stays fixed, its table rows and interpolation fraction are prepared once
 per block. Sparse automation and the initial transient retain the compact loop.
 Regression checks cover all 15 nonempty control subsets, including changes of
 the active subset while a note is held.
+
+See [tests/PERFORMANCE_WORKFLOW.md](tests/PERFORMANCE_WORKFLOW.md) for the complete
+host, Blackfin replay, hardware tracing and candidate-selection procedure.
 
 `tests/analyze_blackfin.py --sdk-root <sdk> --out <fresh-dir>
 --approximate-saturation` checks the Linux tool hashes and emits assembly and stack
