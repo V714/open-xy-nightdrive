@@ -1,40 +1,42 @@
-"""Generate a full-cycle audio sine table and exact quarter-wave reference; feedback stays exact."""
+"""Fit a bounded audio-only sine polynomial; feedback stays on the exact lookup."""
 
 from pathlib import Path
 import hashlib
 import json
+import re
 import numpy as np
 from cpp_format import write_header
 
 ROOT = Path(__file__).resolve().parent.parent
-PHASE_BITS = 13
 
 
 def main():
-    count = 1 << (PHASE_BITS - 2)
-    values = np.rint(np.sin(np.arange(count + 1) / count * np.pi / 2) * 32760).astype(np.int64)
-    text = "#pragma once\n#include <opxy/types.hpp>\nnamespace nightdrive {\n"
-    text += "static const opxy::i16 audio_sine_quarter_lut[" + str(count + 1) + "] = {"
-    text += ",".join(map(str, values)) + "};\n"
-    full = []
-    for position in range(1 << PHASE_BITS):
-        index = position & (count - 1)
-        if position & count:
-            index = count - index
-        value = int(values[index])
-        full.append(-value if position & (2 * count) else value)
-    text += "static const opxy::i16 audio_sine_full_lut[" + str(len(full)) + "] = {"
-    text += ",".join(map(str, full)) + "};\n}\n"
-    header = ROOT / "audio_sine_lut.h"
-    write_header(header, text)
+    text = (ROOT / "tables.h").read_text().split("audio_sine_lut[2048]", 1)[1]
+    values = np.array(
+        [int(v) for v in re.findall(r"-?\d+", text.split("{", 1)[1].split("};", 1)[0])]
+    )
+    x = np.linspace(0, 1, 65537)
+    target = np.interp(x * 512, np.arange(513), values[:513]) / 65536
+    amplitude = float(values[512] / 65536)
+    fit = np.linalg.lstsq(
+        np.stack([x - x**5, x**3 - x**5], axis=1), target - amplitude * x**5, rcond=None
+    )[0]
+    coefficients = [float(fit[0]), float(fit[1]), amplitude - float(fit.sum())]
+    fixed = [int(round(v * 2147483648)) for v in coefficients]
+    header = ROOT / "audio_sine_coefficients.h"
+    source = "#pragma once\n#include <opxy/types.hpp>\nnamespace nightdrive {\n"
+    source += "".join(
+        "static const opxy::i32 audio_sine_" + name + " = " + str(value) + ";\n"
+        for name, value in zip("abc", fixed)
+    )
+    write_header(header, source + "}\n")
     manifest = {
         "experimental": True,
-        "kind": "nearest phase, direct full-cycle lookup, output carriers only",
-        "phase_bits": PHASE_BITS,
-        "quarter_nodes": count + 1,
-        "table_bytes": len(full) * 2,
-        "reference_quarter_bytes": (count + 1) * 2,
-        "peak_q15": 32760,
+        "kind": "branch-free odd degree-five quarter-wave polynomial, output carriers only",
+        "coefficients_q31": fixed,
+        "fit_points": 65537,
+        "fit_constraint": "original quarter-wave endpoint amplitude",
+        "target_tables_sha256": hashlib.sha256((ROOT / "tables.h").read_bytes()).hexdigest(),
         "feedback_oscillator": "original exact packed lookup",
         "phase_and_control_state": "exact",
         "relative_rms_error_limit_db": -55,

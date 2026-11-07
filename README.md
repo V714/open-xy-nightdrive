@@ -193,13 +193,12 @@ firmware, stock artwork or third-party audio samples are included.
 ## CPU analysis without firmware
 
 The feedback oscillator retains its original packed sine lookup and Q31 rounding.
-Output carrier sines use a direct nearest-phase lookup with 8192 full-cycle
-Q15 nodes (16384 bytes). The former quarter-wave table remains as a test reference
-and is discarded from production objects. Both forms match for all phase bins. This removes interpolation multiplications
-from the output oscillators; oscillator phase, feedback and controls stay exact.
-Regenerate it with `python generators/generate_audio_sine.py`. The 80/20 output
-blend uses one multiply; its rounding differs by at most one Q31 unit from
-the previous two-multiply expression, before downstream processing.
+Output carrier sines use a degree-five quarter-wave polynomial with arithmetic
+phase folding and sign restoration. It uses no phase-dependent branches or
+additional waveform tables. Feedback retains its original exact sine lookup.
+Regenerate coefficients with `python generators/generate_audio_sine.py`.
+The 80/20 output blend uses one multiply; its rounding differs by at most one
+Q31 unit from the previous two-multiply expression, before downstream processing.
 
 Glare uses the original 33 × 129 Q15 grid with the exact former 16-bit amplitude
 interpolation fraction. Its packed segment representation remains in the generated

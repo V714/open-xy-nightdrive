@@ -8,29 +8,30 @@ static void require(bool value, const char *reason) {
         std::exit(1);
     }
 }
+static opxy::i32 reference_audio_sine(opxy::u32 phase) {
+    const opxy::u32 half = phase & 0x7fffffffu;
+    const opxy::u32 folded = half <= 0x40000000u ? half : 0x80000000u - half;
+    const opxy::i32 x = folded == 0x40000000u ? 2147483647 : opxy::i32(folded << 1);
+    const auto squared = dsp::multiply(x, x);
+    const auto polynomial =
+        audio_sine_a + dsp::multiply(squared, audio_sine_b + dsp::multiply(squared, audio_sine_c));
+    const auto signal = dsp::multiply(x, polynomial);
+    return phase & 0x80000000u ? -signal : signal;
+}
 int main() {
     require(dsp::sine_audio(0) == 0 && dsp::sine_audio(0x80000000u) == 0, "zero crossings");
-    require(dsp::sine_audio(0x40000000u) == 32760 * 32768 &&
-                dsp::sine_audio(0xc0000000u) == -32760 * 32768,
-            "quarter-wave peaks");
-    for (unsigned i = 0; i <= 512; ++i)
-        require(audio_sine_quarter_lut[i * 4] == audio_sine_lut[i], "original aligned nodes");
-    for (unsigned position = 0; position < 8192; ++position) {
-        unsigned index = position & 2047u;
-        if (position & 2048u)
-            index = 2048u - index;
-        const auto quarter =
-            position & 4096u ? -audio_sine_quarter_lut[index] : audio_sine_quarter_lut[index];
-        require(audio_sine_full_lut[position] == quarter, "full and quarter tables differ");
-        require(dsp::sine_audio(opxy::u32(position) << 19) == quarter * 32768,
-                "full-cycle phase indexing");
-    }
+    for (unsigned quadrant = 0; quadrant < 4; ++quadrant)
+        for (int offset = -32; offset <= 32; ++offset) {
+            const auto phase = (opxy::u32(quadrant) << 30) + opxy::u32(offset);
+            require(dsp::sine_audio(phase) == reference_audio_sine(phase), "quadrant boundaries");
+        }
     opxy::u32 random = 17;
     for (unsigned i = 0; i < 2000000; ++i) {
         random = random * 1664525u + 1013904223u;
         const auto value = dsp::sine_audio(random);
+        require(value == reference_audio_sine(random), "branch-free polynomial differs");
         const opxy::i64 error = opxy::i64(value) - dsp::sine(random);
-        require(error >= -450000 && error <= 450000, "phase quantization bound");
+        require(error >= -150000 && error <= 150000, "polynomial approximation bound");
         require(dsp::sine_audio(random + 0x80000000u) == -value, "half-cycle symmetry");
     }
     for (unsigned i = 0; i < 100000; ++i) {
@@ -42,5 +43,6 @@ int main() {
         const auto candidate = dsp::mix(a, b, 429496729);
         require(candidate == previous || candidate == previous - 1, "one-LSB blend rounding bound");
     }
-    std::puts("PASS audio sine: nodes, wrap, symmetry, 2 million phases and blend rounding");
+    std::puts("PASS audio sine: branch-free equivalence, wrap, symmetry, 2 million phases and "
+              "blend rounding");
 }
