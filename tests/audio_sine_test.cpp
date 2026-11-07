@@ -29,6 +29,10 @@ int main() {
     for (unsigned i = 0; i < 2000000; ++i) {
         random = random * 1664525u + 1013904223u;
         const auto value = dsp::sine_audio(random);
+        opxy::i32 pairedA, pairedB;
+        const auto other = random * 1664525u + 1013904223u;
+        dsp::sine_audio_pair(random, other, pairedA, pairedB);
+        require(pairedA == value && pairedB == dsp::sine_audio(other), "paired polynomial differs");
         require(value == reference_audio_sine(random), "branch-free polynomial differs");
         const opxy::i64 error = opxy::i64(value) - dsp::sine(random);
         require(error >= -150000 && error <= 150000, "polynomial approximation bound");

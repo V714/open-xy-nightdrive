@@ -35,6 +35,25 @@ static inline i32 sine_audio(u32 phase) {
     const i32 sign = -i32(phase >> 31);
     return (signal ^ sign) - sign;
 }
+[[gnu::always_inline]] static inline i32 audio_fold(u32 phase) {
+    const i32 centered = i32(phase & 0x7fffffffu) - 1073741824;
+    const i32 magnitude = centered < 0 ? -centered : centered;
+    const u32 doubled = (1073741824u - u32(magnitude)) << 1;
+    return i32(doubled - (doubled >> 31));
+}
+// Interleave independent polynomial chains to expose instruction-level parallelism.
+[[gnu::always_inline]] static inline void sine_audio_pair(u32 a, u32 b, i32 &outA, i32 &outB) {
+    const i32 xA = audio_fold(a), xB = audio_fold(b);
+    const i32 squareA = multiply(xA, xA), squareB = multiply(xB, xB);
+    const i32 firstA = multiply(squareA, audio_sine_c), firstB = multiply(squareB, audio_sine_c);
+    const i32 secondA = multiply(squareA, audio_sine_b + firstA);
+    const i32 secondB = multiply(squareB, audio_sine_b + firstB);
+    const i32 valueA = multiply(xA, audio_sine_a + secondA);
+    const i32 valueB = multiply(xB, audio_sine_a + secondB);
+    const i32 signA = -i32(a >> 31), signB = -i32(b >> 31);
+    outA = (valueA ^ signA) - signA;
+    outB = (valueB ^ signB) - signB;
+}
 static inline i32 lut(const i32 *table, i32 control) {
     unsigned j = u32(control) >> 23;
     return mix(table[j], table[j + 1], i32((u32(control) & 0x7fffffu) << 8));

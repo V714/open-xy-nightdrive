@@ -72,11 +72,13 @@ static inline void render_range(Voice &voice, opxy::Output output, opxy::Pitch p
             i32 envelope = i32(3528 - age) * 608697;
             transientPhase = u32(multiply(phaseModulation, multiply(drift, envelope)));
         }
-        const i32 fundamental = sine_audio(carrier);
         const u32 phaseOffset = u32(phaseModulation) * 2u + transientPhase;
-        i32 signal = fundamental;
-        if (!ZeroModulation) {
-            const i32 modulatedSignal = sine_audio(carrier + phaseOffset);
+        i32 signal;
+        if (ZeroModulation) {
+            signal = sine_audio(carrier);
+        } else {
+            i32 fundamental, modulatedSignal;
+            sine_audio_pair(carrier, carrier + phaseOffset, fundamental, modulatedSignal);
             signal = mix(modulatedSignal, fundamental, 429496729);
         }
         if (Punch) {
@@ -208,8 +210,9 @@ render_planned_sustain(Voice &voice, Shared &, u32, opxy::Output output,
             feedback1 = feedback0;
             feedback0 = modulatorSignal;
             const i32 phaseModulation = multiply(modulatorSignal * 2, frame.modulation);
-            const i32 fundamental = sine_audio(carrier);
-            const i32 modulatedSignal = sine_audio(carrier + u32(phaseModulation) * 2u);
+            i32 fundamental, modulatedSignal;
+            sine_audio_pair(carrier, carrier + u32(phaseModulation) * 2u, fundamental,
+                            modulatedSignal);
             i32 signal = mix(modulatedSignal, fundamental, 429496729);
             signal = glareChanging ? saturate_approx(signal, frame.glare)
                                    : apply_shaper(signal, heldShaper);
@@ -307,8 +310,9 @@ template <bool AllChanging>
             i32 envelope = i32(3528 - age) * 608697;
             transientPhase = u32(multiply(phaseModulation, multiply(drift, envelope)));
         }
-        i32 fundamental = sine_audio(carrier),
-            modulatedSignal = sine_audio(carrier + u32(phaseModulation) * 2u + transientPhase);
+        i32 fundamental, modulatedSignal;
+        sine_audio_pair(carrier, carrier + u32(phaseModulation) * 2u + transientPhase, fundamental,
+                        modulatedSignal);
         i32 signal = mix(modulatedSignal, fundamental, 429496729);
         if (age < 1103) {
             i32 envelope = i32(1103 - age) * 1946948;
