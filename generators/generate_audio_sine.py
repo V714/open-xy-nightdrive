@@ -1,4 +1,4 @@
-"""Generate an audio-only nearest-phase quarter-wave sine table; feedback stays exact."""
+"""Generate a full-cycle audio sine table and exact quarter-wave reference; feedback stays exact."""
 
 from pathlib import Path
 import hashlib
@@ -15,15 +15,25 @@ def main():
     values = np.rint(np.sin(np.arange(count + 1) / count * np.pi / 2) * 32760).astype(np.int64)
     text = "#pragma once\n#include <opxy/types.hpp>\nnamespace nightdrive {\n"
     text += "static const opxy::i16 audio_sine_quarter_lut[" + str(count + 1) + "] = {"
-    text += ",".join(map(str, values)) + "};\n}\n"
+    text += ",".join(map(str, values)) + "};\n"
+    full = []
+    for position in range(1 << PHASE_BITS):
+        index = position & (count - 1)
+        if position & count:
+            index = count - index
+        value = int(values[index])
+        full.append(-value if position & (2 * count) else value)
+    text += "static const opxy::i16 audio_sine_full_lut[" + str(len(full)) + "] = {"
+    text += ",".join(map(str, full)) + "};\n}\n"
     header = ROOT / "audio_sine_lut.h"
     write_header(header, text)
     manifest = {
         "experimental": True,
-        "kind": "nearest phase, quarter-wave symmetry, output carriers only",
+        "kind": "nearest phase, direct full-cycle lookup, output carriers only",
         "phase_bits": PHASE_BITS,
         "quarter_nodes": count + 1,
-        "table_bytes": (count + 1) * 2,
+        "table_bytes": len(full) * 2,
+        "reference_quarter_bytes": (count + 1) * 2,
         "peak_q15": 32760,
         "feedback_oscillator": "original exact packed lookup",
         "phase_and_control_state": "exact",

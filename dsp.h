@@ -22,14 +22,9 @@ static inline i32 sine(u32 p) {
     const i32 delta = i32(opxy::i16(packed >> 16)) * 32768;
     return a + multiply(delta, i32((p & 0x1fffffu) << 10));
 }
-// Nearest of 8192 phase positions; quarter-wave storage. Feedback keeps exact lookup.
+// Direct nearest-phase lookup; exactly matches the quarter-wave representation.
 static inline i32 sine_audio(u32 phase) {
-    const u32 position = (phase + 0x00040000u) >> 19;
-    unsigned index = position & 2047u;
-    if (position & 2048u)
-        index = 2048u - index;
-    const i32 signal = i32(audio_sine_quarter_lut[index]) * 32768;
-    return position & 4096u ? -signal : signal;
+    return i32(audio_sine_full_lut[(phase + 0x00040000u) >> 19]) * 32768;
 }
 static inline i32 lut(const i32 *table, i32 control) {
     unsigned j = u32(control) >> 23;

@@ -15,6 +15,16 @@ int main() {
             "quarter-wave peaks");
     for (unsigned i = 0; i <= 512; ++i)
         require(audio_sine_quarter_lut[i * 4] == audio_sine_lut[i], "original aligned nodes");
+    for (unsigned position = 0; position < 8192; ++position) {
+        unsigned index = position & 2047u;
+        if (position & 2048u)
+            index = 2048u - index;
+        const auto quarter =
+            position & 4096u ? -audio_sine_quarter_lut[index] : audio_sine_quarter_lut[index];
+        require(audio_sine_full_lut[position] == quarter, "full and quarter tables differ");
+        require(dsp::sine_audio(opxy::u32(position) << 19) == quarter * 32768,
+                "full-cycle phase indexing");
+    }
     opxy::u32 random = 17;
     for (unsigned i = 0; i < 2000000; ++i) {
         random = random * 1664525u + 1013904223u;

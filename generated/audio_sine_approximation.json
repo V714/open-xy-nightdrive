@@ -1,12 +1,13 @@
 {
   "experimental": true,
-  "kind": "nearest phase, quarter-wave symmetry, output carriers only",
+  "kind": "nearest phase, direct full-cycle lookup, output carriers only",
   "phase_bits": 13,
   "quarter_nodes": 2049,
-  "table_bytes": 4098,
+  "table_bytes": 16384,
+  "reference_quarter_bytes": 4098,
   "peak_q15": 32760,
   "feedback_oscillator": "original exact packed lookup",
   "phase_and_control_state": "exact",
   "relative_rms_error_limit_db": -55,
-  "header_sha256": "9bb20e5761e9e79c849e3ce7ebbc526d13766c457d7fc81a628d97b23debe818"
+  "header_sha256": "159c319133fa822e5b3af30a62ebe9dfd054a82495faba6f501c2c5cda558950"
 }
