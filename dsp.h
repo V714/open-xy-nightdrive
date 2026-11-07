@@ -135,7 +135,7 @@ static inline i32 saturate(i32 x, i32 drive) {
         return x;
     return saturate(x, drive, multiply(drive, drive), lut(drive_comp_lut, drive));
 }
-static const bool use_packed_shaper = false;
+static const bool use_packed_shaper = true;
 // Experimental bilinear output-shaper LUT: no change to oscillator or feedback state.
 [[gnu::always_inline]] static inline i32 interpolate_segment(u32 segment, u32 amplitude) {
     const unsigned shift = 31 - shaper_amplitude_bits;

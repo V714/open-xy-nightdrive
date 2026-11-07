@@ -203,9 +203,9 @@ Regenerate coefficients with `python generators/generate_audio_sine.py`.
 The 80/20 output blend uses one multiply; its rounding differs by at most one
 Q31 unit from the previous two-multiply expression, before downstream processing.
 
-Glare uses the original 33 × 129 Q15 grid with the exact former 16-bit amplitude
-interpolation fraction. Its packed segment representation remains in the generated
-header for reference checks and is discarded from production. Stable controls
+Glare stores each of its 33 × 128 segments as one packed Q15 base/slope word,
+retaining the original 16-bit amplitude interpolation fraction. The original
+33 × 129 grid remains available to reference checks and is discarded from production. Stable controls
 prepare pitch coefficients and Glare rows once per block, reusing them across
 transient boundaries. Audio state is held locally inside each sample range.
 Voice remains 64 bytes; there is no derived per-voice coefficient cache.
