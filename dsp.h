@@ -1,7 +1,6 @@
 #pragma once
 #include "core.h"
 #include "tables.h"
-#include "feedback_sine_quarter.h"
 #include "approx_lut.h"
 #include "audio_sine_coefficients.h"
 #include <opxy/q31.hpp>
@@ -16,17 +15,12 @@ static inline i32 clamp(i32 x, i32 lo, i32 hi) {
 static inline i32 mix(i32 a, i32 b, i32 t) {
     return a + multiply(b - a, t);
 }
-// Mirror the exact discrete table. Apply polarity before the truncating multiply:
-// negating an interpolated result would change negative values by one Q31 unit.
 static inline i32 sine(u32 p) {
-    const i32 centered = i32(p & 0x7fffffffu) - 1073741824;
-    const i32 magnitude = centered < 0 ? -centered : centered;
-    const u32 folded = 1073741824u - u32(magnitude);
-    const u32 packed = feedback_sine_quarter[folded >> 21];
-    const i32 sign = -i32(p >> 31);
-    const i32 a = ((i32(packed & 65535u) ^ sign) - sign) * 32768;
-    const i32 delta = ((i32(packed >> 16) ^ sign) - sign) * 32768;
-    return a + multiply(delta, i32((folded & 0x1fffffu) << 10));
+    unsigned j = p >> 21;
+    const u32 packed = sine_packed_lut[j];
+    const i32 a = i32(opxy::i16(packed & 65535u)) * 32768;
+    const i32 delta = i32(opxy::i16(packed >> 16)) * 32768;
+    return a + multiply(delta, i32((p & 0x1fffffu) << 10));
 }
 // Branch-free quarter-wave polynomial for audio only; feedback keeps exact lookup.
 static inline i32 sine_audio(u32 phase) {
