@@ -207,11 +207,13 @@ struct PreparedShaper {
 static inline i32 saturate_approx(i32 x, i32 drive) {
     return saturate_approx(x, drive, 0, 0, 0);
 }
-static inline i32 dc_block(i32 x, i32 &previous, i32 &state) {
-    i32 half = x / 2 - previous / 2 + multiply(state, 2145980416) / 2;
-    previous = x;
-    state = clamp(half, -805306368, 805306368) * 2;
-    return state;
+// Half-scale history avoids repeated signed divisions. The returned sample is
+// already at engine output scale and bounded to +/-402653184.
+static inline i32 dc_block_scaled(i32 x, i32 &previous, i32 &state) {
+    const i32 input = opxy::q31::half(x);
+    state = clamp(input + (multiply(state, 2145980416) - previous), -805306368, 805306368);
+    previous = input;
+    return opxy::q31::half(state);
 }
 } // namespace dsp
 } // namespace nightdrive

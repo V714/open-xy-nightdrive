@@ -88,7 +88,7 @@ static inline void render_range(Voice &voice, opxy::Output output, opxy::Pitch p
         signal = apply_shaper(signal, prepared.shaper);
         if (ModTransient)
             ++age;
-        output[i] = clamp(dc_block(signal, previous, dc) / 4, -402653184, 402653184);
+        output[i] = dc_block_scaled(signal, previous, dc);
         carrier += increment;
         modulator += factors.modulator;
     }
@@ -133,7 +133,7 @@ static inline void render_block(Voice &voice, opxy::Output output, opxy::Pitch p
                                                                   prepared);
 }
 // After the finite attack, plan independent coefficients in bounded spans before the FM loop.
-template <bool AllChanging>
+template <unsigned Mask>
 [[gnu::noinline]] static void
 render_planned_sustain(Voice &voice, Shared &, u32, opxy::Output output,
                        opxy::Parameters parameters, opxy::Pitch pitch) {
@@ -143,11 +143,11 @@ render_planned_sustain(Voice &voice, Shared &, u32, opxy::Output output,
     const i32 tensionTarget = parameters[1] < 0 ? 0 : parameters[1];
     const i32 driftTarget = parameters[2] < 0 ? 0 : parameters[2];
     const i32 glareTarget = parameters[3] < 0 ? 0 : parameters[3];
-    const bool glareChanging = AllChanging || glare != glareTarget;
+    const bool glareChanging = (Mask & 8) || (!Mask && glare != glareTarget);
     const PreparedShaper heldShaper = prepare_shaper(glareChanging ? 0 : glare);
-    const bool speedChanging = AllChanging || speed != parameters[0];
-    const bool tensionChanging = AllChanging || tension != parameters[1];
-    const bool driftChanging = AllChanging || drift != parameters[2];
+    const bool speedChanging = (Mask & 1) || (!Mask && speed != parameters[0]);
+    const bool tensionChanging = (Mask & 2) || (!Mask && tension != parameters[1]);
+    const bool driftChanging = (Mask & 4) || (!Mask && drift != parameters[2]);
     bool fixedPitch = !speedChanging;
     if (fixedPitch)
         for (unsigned i = 1; i < 64; ++i)
@@ -216,7 +216,7 @@ render_planned_sustain(Voice &voice, Shared &, u32, opxy::Output output,
             i32 signal = mix(modulatedSignal, fundamental, 429496729);
             signal = glareChanging ? saturate_approx(signal, frame.glare)
                                    : apply_shaper(signal, heldShaper);
-            output[i] = clamp(dc_block(signal, previous, dc) / 4, -402653184, 402653184);
+            output[i] = dc_block_scaled(signal, previous, dc);
             carrier += pitch[i];
             modulator += frame.modulator;
         }
@@ -232,8 +232,9 @@ render_planned_sustain(Voice &voice, Shared &, u32, opxy::Output output,
     voice.prev = previous;
     voice.dc = dc;
 }
-// Select full automation once per block; partial automation updates only moving coefficients.
-template <bool AllChanging>
+// Mask bits select Speed, Tension, Drift and Glare. WholeAttack is dispatched
+// only when all 64 samples are before Punch ends, removing per-sample age checks.
+template <unsigned Mask, bool WholeAttack = false>
 [[gnu::noinline]] static void render_dynamic_impl(Voice &voice, Shared &, u32, opxy::Output output,
                                                   opxy::Parameters parameters, opxy::Pitch pitch) {
     if (!voice.ready) {
@@ -247,10 +248,11 @@ template <bool AllChanging>
     const i32 tensionTarget = parameters[1] < 0 ? 0 : parameters[1];
     const i32 driftTarget = parameters[2] < 0 ? 0 : parameters[2];
     const i32 glareTarget = parameters[3] < 0 ? 0 : parameters[3];
-    const bool glareChanging = AllChanging || glare != glareTarget;
-    const bool speedChanging = AllChanging || speed != parameters[0];
-    const bool tensionChanging = AllChanging || tension != parameters[1];
-    const bool driftChanging = AllChanging || drift != parameters[2];
+    const bool glareChanging = (Mask & 8) || (!Mask && glare != glareTarget);
+    const PreparedShaper heldShaper = prepare_shaper(glareChanging ? 0 : glare);
+    const bool speedChanging = (Mask & 1) || (!Mask && speed != parameters[0]);
+    const bool tensionChanging = (Mask & 2) || (!Mask && tension != parameters[1]);
+    const bool driftChanging = (Mask & 4) || (!Mask && drift != parameters[2]);
     bool fixedPitch = !speedChanging;
     if (fixedPitch)
         for (unsigned i = 1; i < 64; ++i)
@@ -264,7 +266,7 @@ template <bool AllChanging>
     i32 feedback0 = voice.feedback[0], feedback1 = voice.feedback[1];
     i32 previous = voice.prev, dc = voice.dc;
     i32 previousGlare = glare;
-    i32 punchAmount = age < 1103 ? punch_amount(previousGlare) : 0;
+    i32 punchAmount = !WholeAttack && age < 1103 ? punch_amount(previousGlare) : 0;
     i32 ratio = operator_ratio(speed);
     i32 feedbackAmount = feedback_amount(tension), modulationAmount = modulation_amount(drift);
     for (unsigned i = 0; i < 64; ++i) {
@@ -282,7 +284,9 @@ template <bool AllChanging>
             feedbackAmount = feedback_amount(tension);
         if (driftChanging)
             modulationAmount = modulation_amount(drift);
-        if (age < 1103 && glare != previousGlare) {
+        if (WholeAttack) {
+            punchAmount = punch_amount(glare);
+        } else if (age < 1103 && glare != previousGlare) {
             previousGlare = glare;
             punchAmount = punch_amount(glare);
         }
@@ -306,7 +310,7 @@ template <bool AllChanging>
         i32 phaseModulation = multiply(modulatorSignal * 2, multiply(modulationAmount, bandwidth));
         // Linear finite transients leave steady sustain entirely to stock ADSR.
         u32 transientPhase = 0;
-        if (age < 3528) {
+        if (WholeAttack || age < 3528) {
             i32 envelope = i32(3528 - age) * 608697;
             transientPhase = u32(multiply(phaseModulation, multiply(drift, envelope)));
         }
@@ -314,14 +318,15 @@ template <bool AllChanging>
         sine_audio_pair(carrier, carrier + u32(phaseModulation) * 2u + transientPhase, fundamental,
                         modulatedSignal);
         i32 signal = mix(modulatedSignal, fundamental, 429496729);
-        if (age < 1103) {
+        if (WholeAttack || age < 1103) {
             i32 envelope = i32(1103 - age) * 1946948;
             signal += multiply(signal, multiply(punchAmount, envelope)) / 2;
         }
-        signal = saturate_approx(signal, glare);
-        if (age < 3528)
+        signal = glareChanging ? saturate_approx(signal, glare)
+                               : apply_shaper(signal, heldShaper);
+        if (WholeAttack || age < 3528)
             ++age;
-        output[i] = clamp(dc_block(signal, previous, dc) / 4, -402653184, 402653184);
+        output[i] = dc_block_scaled(signal, previous, dc);
         carrier += increment;
         modulator += modInc;
     }
@@ -339,6 +344,29 @@ template <bool AllChanging>
 }
 static inline void render_dynamic(Voice &voice, Shared &shared, u32 owner, opxy::Output output,
                                   opxy::Parameters parameters, opxy::Pitch pitch) {
+    // Specialize the common one-control cases; keep a shared mixed-control path.
+    unsigned mask = 0;
+    for (unsigned k = 0; k < 4; ++k)
+        if (voice.controls[k] != parameters[k]) mask |= 1u << k;
+    if (mask == 2) {
+        render_dynamic_impl<2>(voice, shared, owner, output, parameters, pitch);
+        return;
+    }
+    if (mask == 4) {
+        render_dynamic_impl<4>(voice, shared, owner, output, parameters, pitch);
+        return;
+    }
+    if (mask == 8) {
+        render_dynamic_impl<8>(voice, shared, owner, output, parameters, pitch);
+        return;
+    }
+    if (mask == 1) {
+        if (voice.transientAge >= 3528)
+            render_planned_sustain<1>(voice, shared, owner, output, parameters, pitch);
+        else
+            render_dynamic_impl<1>(voice, shared, owner, output, parameters, pitch);
+        return;
+    }
     const bool speedChanging = voice.controls[0] != parameters[0];
     const bool otherThreeChanging = voice.controls[1] != parameters[1] &&
                                     voice.controls[2] != parameters[2] &&
@@ -346,13 +374,15 @@ static inline void render_dynamic(Voice &voice, Shared &shared, u32 owner, opxy:
     const bool allChanging = speedChanging && otherThreeChanging;
     if (voice.transientAge >= 3528 && (speedChanging || otherThreeChanging)) {
         if (allChanging)
-            render_planned_sustain<true>(voice, shared, owner, output, parameters, pitch);
+            render_planned_sustain<15>(voice, shared, owner, output, parameters, pitch);
         else
-            render_planned_sustain<false>(voice, shared, owner, output, parameters, pitch);
-    } else if (allChanging)
-        render_dynamic_impl<true>(voice, shared, owner, output, parameters, pitch);
+            render_planned_sustain<0>(voice, shared, owner, output, parameters, pitch);
+    } else if (allChanging && voice.transientAge <= 1103 - 64)
+        render_dynamic_impl<15, true>(voice, shared, owner, output, parameters, pitch);
+    else if (allChanging)
+        render_dynamic_impl<15>(voice, shared, owner, output, parameters, pitch);
     else
-        render_dynamic_impl<false>(voice, shared, owner, output, parameters, pitch);
+        render_dynamic_impl<0>(voice, shared, owner, output, parameters, pitch);
 }
 static inline void render(Voice &voice, Shared &shared, u32 owner, opxy::Output output,
                           opxy::Parameters parameters, opxy::Pitch pitch) {
