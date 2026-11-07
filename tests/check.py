@@ -52,6 +52,7 @@ def main():
     for name in [
         "range_test",
         "audio_sine_test",
+        "feedback_sine_test",
         "envelope_test",
         "display_test",
         "sound_test",

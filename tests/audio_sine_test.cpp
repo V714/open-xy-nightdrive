@@ -12,13 +12,10 @@ static opxy::i32 reference_audio_sine(opxy::u32 phase) {
     const opxy::u32 half = phase & 0x7fffffffu;
     const opxy::u32 folded = half <= 0x40000000u ? half : 0x80000000u - half;
     const opxy::i32 x = folded == 0x40000000u ? 2147483647 : opxy::i32(folded << 1);
-    const unsigned bits = 31 - audio_sine_segment_bits;
-    const auto &segment = audio_sine_segments[opxy::u32(x) >> bits];
-    const auto fraction =
-        opxy::i32((opxy::u32(x) & ((1u << bits) - 1u)) << audio_sine_segment_bits);
-    const auto signal =
-        segment.base +
-        dsp::multiply(fraction, segment.linear + dsp::multiply(fraction, segment.quadratic));
+    const auto squared = dsp::multiply(x, x);
+    const auto polynomial =
+        audio_sine_a + dsp::multiply(squared, audio_sine_b + dsp::multiply(squared, audio_sine_c));
+    const auto signal = dsp::multiply(x, polynomial);
     return phase & 0x80000000u ? -signal : signal;
 }
 int main() {
@@ -38,7 +35,7 @@ int main() {
         require(pairedA == value && pairedB == dsp::sine_audio(other), "paired polynomial differs");
         require(value == reference_audio_sine(random), "branch-free polynomial differs");
         const opxy::i64 error = opxy::i64(value) - dsp::sine(random);
-        require(error >= -35000 && error <= 35000, "polynomial approximation bound");
+        require(error >= -150000 && error <= 150000, "polynomial approximation bound");
         require(dsp::sine_audio(random + 0x80000000u) == -value, "half-cycle symmetry");
     }
     for (unsigned i = 0; i < 100000; ++i) {

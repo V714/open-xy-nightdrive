@@ -1,0 +1,10 @@
+{
+  "exact": true,
+  "full_cycle_nodes": 2048,
+  "quarter_entries": 513,
+  "runtime_table_bytes": 2052,
+  "reference_packed_table_bytes": 8192,
+  "negative_interpolation": "polarity is applied before Q31 truncation",
+  "target_tables_sha256": "251ce1ccf8aae4cbe8f29112949358184d71b769d5fdf04696ef0866055d8e35",
+  "header_sha256": "c43b7268952e55aabe058dab282473028b84c4887603807e19ffe8d3b863b12e"
+}
