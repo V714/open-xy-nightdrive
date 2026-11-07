@@ -28,7 +28,7 @@ def main():
     out.mkdir(exist_ok=False)
     tools = tool_paths(sdk / 'local/toolchain/bin')
     cxx = compiler_paths(sdk / 'local/toolchain')['cxx']
-    subprocess.run([str(tools['as']), '-mcpu=bf707', str(lab / 'blackfin_lab_runtime.S'), '-o', str(out / 'runtime.o')], check=True)
+    subprocess.run([str(tools['as']), '-mcpu=bf707', str(lab / 'blackfin_lab_runtime.s.in'), '-o', str(out / 'runtime.o')], check=True)
     for source in ('blackfin_replay.cpp', 'blackfin_native_runtime.cpp'):
         compile_cxx(cxx, tools['as'], lab / source, out / (source + '.o'),
                     [sdk / 'sdk/include', sdk / 'sdk/platform/blackfin/freestanding', machine])
